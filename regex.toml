@@ -1,0 +1,5 @@
+rules:
+  - id: ip_address
+    description: IP address pattern
+    regex: '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
+    entropy: false
