@@ -1,0 +1,23 @@
+pip install tomlkit
+
+
+# lint_toml.py
+
+import sys
+import tomlkit
+
+def lint_toml(file_path):
+    with open(file_path, 'r') as f:
+        try:
+            tomlkit.parse(f.read())
+            print(f"{file_path}: OK")
+        except tomlkit.exceptions.ParseError as e:
+            print(f"{file_path}: ERROR - {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python lint_toml.py <file1.toml> [<file2.toml> ...]")
+        sys.exit(1)
+
+    for file_path in sys.argv[1:]:
+        lint_toml(file_path)
