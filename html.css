@@ -1,86 +1,87 @@
     html_template = """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>ML Scan Report</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                padding: 20px;
-                background-color: #f9f9f9;
-            }
-            table {
-                width: 50%;
-                border-collapse: collapse;
-                margin-bottom: 20px;
-            }
-            th, td {
-                border: 1px solid #ddd;
-                padding: 12px;
-                text-align: left;
-            }
-            th {
-                background-color: #f2f2f2;
-                width: 30%;
-            }
-            .severity-low {
-                color: yellow;
-            }
-            .severity-medium {
-                color: orange;
-            }
-            .severity-high {
-                color: red;
-            }
-            .severity-critical {
-                color: maroon;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>ML Scan Summary</h1>
-        <table>
-            <tr>
-                <th>Total Issues by Severity</th>
-                <td class="severity-low">LOW: {low_count}</td>
-                <td class="severity-medium">MEDIUM: {medium_count}</td>
-                <td class="severity-high">HIGH: {high_count}</td>
-                <td class="severity-critical">CRITICAL: {critical_count}</td>
-            </tr>
-            <tr>
-                <th>Total Issues</th>
-                <td colspan="4">{total_issues}</td>
-            </tr>
-            <tr>
-                <th>Input Path</th>
-                <td colspan="4">{input_path}</td>
-            </tr>
-            <tr>
-                <th>Absolute Path</th>
-                <td colspan="4">{absolute_path}</td>
-            </tr>
-            <tr>
-                <th>ModelScan Version</th>
-                <td colspan="4">{modelscan_version}</td>
-            </tr>
-            <tr>
-                <th>Timestamp</th>
-                <td colspan="4">{timestamp}</td>
-            </tr>
-            <tr>
-                <th>Total Scanned</th>
-                <td colspan="4">{total_scanned}</td>
-            </tr>
-            <tr>
-                <th>Total Skipped</th>
-                <td colspan="4">{total_skipped}</td>
-            </tr>
-            <tr>
-                <th>Skipped Files</th>
-                <td colspan="4">{skipped_files}</td>
-            </tr>
-        </table>
-    </body>
-    </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Scan Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            width: 30%;
+        }
+        .severity-low {
+            color: yellow;
+        }
+        .severity-medium {
+            color: orange;
+        }
+        .severity-high {
+            color: red;
+        }
+        .severity-critical {
+            color: maroon;
+        }
+    </style>
+</head>
+<body>
+    <h1>ML Scan Summary</h1>
+    <table>
+        <tr>
+            <th>Total Issues by Severity</th>
+            <td class="severity-low">LOW: {low_count}</td>
+            <td class="severity-medium">MEDIUM: {medium_count}</td>
+            <td class="severity-high">HIGH: {high_count}</td>
+            <td class="severity-critical">CRITICAL: {critical_count}</td>
+        </tr>
+        <tr>
+            <th>Total Issues</th>
+            <td colspan="4">{total_issues}</td>
+        </tr>
+        <tr>
+            <th>Input Path</th>
+            <td colspan="4">{input_path}</td>
+        </tr>
+        <tr>
+            <th>Absolute Path</th>
+            <td colspan="4">{absolute_path}</td>
+        </tr>
+        <tr>
+            <th>ModelScan Version</th>
+            <td colspan="4">{modelscan_version}</td>
+        </tr>
+        <tr>
+            <th>Timestamp</th>
+            <td colspan="4">{timestamp}</td>
+        </tr>
+        <tr>
+            <th>Total Scanned</th>
+            <td colspan="4">{total_scanned}</td>
+        </tr>
+        <tr>
+            <th>Total Skipped</th>
+            <td colspan="4">{total_skipped}</td>
+        </tr>
+        <tr>
+            <th>Skipped Files</th>
+            <td colspan="4">{skipped_files}</td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
