@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            width: 30%;
+        }
+        .severity-low {
+            color: green;
+        }
+        .severity-medium {
+            color: orange;
+        }
+        .severity-high {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Scan Summary</h1>
+    <table>
+        <tr>
+            <th>Total Issues by Severity</th>
+            <td class="severity-low">LOW: 5</td>
+            <td class="severity-medium">MEDIUM: 2</td>
+            <td class="severity-high">HIGH: 1</td>
+            <td>CRITICAL: 0</td>
+        </tr>
+        <tr>
+            <th>Total Issues</th>
+            <td colspan="4">8</td>
+        </tr>
+        <tr>
+            <th>Input Path</th>
+            <td colspan="4">/path/to/input</td>
+        </tr>
+        <tr>
+            <th>Absolute Path</th>
+            <td colspan="4">/apps/ado-agent/adoagent/_work/1/s</td>
+        </tr>
+        <tr>
+            <th>ModelScan Version</th>
+            <td colspan="4">0.7.0</td>
+        </tr>
+        <tr>
+            <th>Timestamp</th>
+            <td colspan="4">2024-04-02T08:44:05.623188</td>
+        </tr>
+        <tr>
+            <th>Total Scanned</th>
+            <td colspan="4">1000</td>
+        </tr>
+        <tr>
+            <th>Total Skipped</th>
+            <td colspan="4">0</td>
+        </tr>
+        <tr>
+            <th>Skipped Files</th>
+            <td colspan="4">None</td>
+        </tr>
+    </table>
+</body>
+</html>
