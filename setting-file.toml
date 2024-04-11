@@ -1,0 +1,14 @@
+# Sample setting-file.toml for ModelScan
+
+[scan]
+model_directory = "/path/to/models"
+include_subdirectories = true
+verbosity = "high"
+
+[output]
+report_format = "html"
+report_path = "/path/to/output/report.html"
+
+[thresholds]
+warning_threshold = 5
+critical_threshold = 10
