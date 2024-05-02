@@ -5,7 +5,7 @@ def generate_html_table(cloc_data):
     html += "<tr><th>Language</th><th>Code</th><th>Comments</th><th>Blank</th><th>Total</th></tr>\n"
     
     for lang, stats in cloc_data.items():
-        html += f"<tr><td>{stats['language']}</td><td>{stats['code']}</td><td>{stats['comment']}</td><td>{stats['blank']}</td><td>{stats['total']}</td></tr>\n"
+        html += f"<tr><td>{lang}</td><td>{stats['code']}</td><td>{stats['comment']}</td><td>{stats['blank']}</td><td>{stats['total']}</td></tr>\n"
     
     html += "</table>"
     return html
