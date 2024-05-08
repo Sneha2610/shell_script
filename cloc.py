@@ -36,7 +36,7 @@ def generate_html_table(cloc_data):
     html += "<tr><th>Language</th><th>Code</th><th>Comments</th><th>Blank</th><th>Total</th><th>Files</th></tr>\n"
     
     for lang, stats in cloc_data.items():
-        if lang != "header":  # Skip the header section
+        if lang != "SUM":  # Exclude the "SUM" section
             html += f"<tr><td>{lang}</td><td>{stats.get('code', 0)}</td><td>{stats.get('comment', 0)}</td><td>{stats.get('blank', 0)}</td><td>{stats.get('code', 0) + stats.get('comment', 0) + stats.get('blank', 0)}</td><td>{stats.get('nFiles', 0)}</td></tr>\n"
     
     html += "</table>\n</body>\n</html>"
