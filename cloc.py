@@ -1,7 +1,8 @@
 import json
+import os
 
-def generate_html_table(cloc_data):
-    html = "<!DOCTYPE html>\n<html>\n<head>\n<title>CLOC Report</title>\n<style>\n"
+def generate_html_table(cloc_data, project, repo, branch, build_id):
+    html = f"<!DOCTYPE html>\n<html>\n<head>\n<title>Repo Deck Dash - {project} - {repo} - {branch} - Build ID: {build_id}</title>\n<style>\n"
     html += "    body {\n"
     html += "        font-family: Arial, sans-serif;\n"
     html += "    }\n"
@@ -32,7 +33,7 @@ def generate_html_table(cloc_data):
     html += "        font-weight: bold;\n"
     html += "    }\n"
     html += "</style>\n</head>\n<body>\n"
-    html += "<h1>CLOC Report</h1>\n<table>\n"
+    html += f"<h1>Repo Deck Dash - {project} - {repo} - {branch} - Build ID: {build_id}</h1>\n<table>\n"
     html += "<tr><th>Language</th><th>Code</th><th>Comments</th><th>Blank</th><th>Total</th><th>Files</th></tr>\n"
     
     for lang, stats in cloc_data.items():
@@ -43,10 +44,16 @@ def generate_html_table(cloc_data):
     return html
 
 def convert_cloc_to_html(json_file, html_file):
+    # Get values from Azure DevOps pipeline variables
+    project = os.environ.get('System.TeamProject')
+    repo = os.environ.get('Build.Repository.Name')
+    branch = os.environ.get('Build.SourceBranchName')
+    build_id = os.environ.get('Build.BuildId')
+    
     with open(json_file, 'r') as f:
         cloc_data = json.load(f)
     
-    html_content = generate_html_table(cloc_data)
+    html_content = generate_html_table(cloc_data, project, repo, branch, build_id)
     
     with open(html_file, 'w') as f:
         f.write(html_content)
