@@ -1,5 +1,6 @@
 import requests
 import base64
+import json
 
 # Azure DevOps organization URL and repository details
 organization = 'your_organization'
@@ -27,9 +28,12 @@ response = requests.get(
 # Check the response
 if response.status_code == 200:
     branches = response.json()['value']
+    print(f"Found {len(branches)} branches:")
     for branch in branches:
         branch_name = branch['name']
+        print(f"- {branch_name}")
         if branch_name != protected_branch:
+            print(f"Attempting to delete branch: {branch_name}")
             # API URL to delete the branch
             delete_branch_url = f'https://dev.azure.com/{organization}/{project}/_apis/git/repositories/{repository_id}/refs?filter={branch_name}&api-version=6.0'
             delete_response = requests.delete(
