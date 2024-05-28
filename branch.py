@@ -21,7 +21,8 @@ list_branches_url = f'https://dev.azure.com/{organization}/{project}/_apis/git/r
 response = requests.get(
     list_branches_url,
     headers={
-        'Authorization': f'Basic {auth_header}'
+        'Authorization': f'Basic {auth_header}',
+        'Content-Type': 'application/json'
     }
 )
 
@@ -39,7 +40,8 @@ if response.status_code == 200:
             delete_response = requests.delete(
                 delete_branch_url,
                 headers={
-                    'Authorization': f'Basic {auth_header}'
+                    'Authorization': f'Basic {auth_header}',
+                    'Content-Type': 'application/json'
                 }
             )
             if delete_response.status_code == 204:
