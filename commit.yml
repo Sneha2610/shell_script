@@ -1,0 +1,21 @@
+trigger:
+- main  # or your default branch
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '5.x'  # or the .NET version you need
+    installationPath: $(Agent.ToolsDirectory)/dotnet
+
+- script: |
+    echo Fetching latest commit hash...
+    set latest_commit=$(git rev-parse HEAD)
+    echo Latest commit hash: %latest_commit%
+
+    echo Running Gitleaks...
+    gitleaks detect --commit=%latest_commit%
+  displayName: 'Fetch latest commit and run Gitleaks'
