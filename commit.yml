@@ -1,4 +1,4 @@
-    echo "Fetching the latest commit in the PR branch..."
+echo "Fetching the latest commit in the PR branch..."
     set latest_commit=%BUILD_SOURCEVERSION%
     echo Latest commit in PR: %latest_commit%
 
@@ -7,3 +7,10 @@
     type parent_commit.txt  # Print the contents of the parent_commit.txt file for debugging
 
     set /p parent_commit=<parent_commit.txt
+    echo Parent commit ID: %parent_commit%
+
+    if "%parent_commit%"=="" (
+      echo "Error: Failed to fetch parent commit ID."
+      exit /b 1
+    )
+
