@@ -3,8 +3,9 @@ echo "Fetching the latest commit in the PR branch..."
     echo Latest commit in PR: %latest_commit%
 
     echo "Fetching the parent commit ID of the latest commit in the PR branch..."
-    git rev-parse %latest_commit%^ > parent_commit.txt
-    type parent_commit.txt  # Print the contents of the parent_commit.txt file for debugging
+    git log -1 --pretty=format:"%P" %latest_commit% > parent_commit.txt
+    echo Contents of parent_commit.txt:
+    type parent_commit.txt
 
     set /p parent_commit=<parent_commit.txt
     echo Parent commit ID: %parent_commit%
@@ -13,4 +14,3 @@ echo "Fetching the latest commit in the PR branch..."
       echo "Error: Failed to fetch parent commit ID."
       exit /b 1
     )
-
