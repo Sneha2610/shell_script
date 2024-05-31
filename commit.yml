@@ -12,10 +12,21 @@ steps:
     installationPath: $(Agent.ToolsDirectory)/dotnet
 
 - script: |
-    echo Fetching latest commit hash...
-    set latest_commit=$(git rev-parse HEAD)
+    trigger:
+- main  # Replace with your branch if necessary
+
+pool:
+  vmImage: 'windows-latest'  # You can use 'ubuntu-latest' for a Linux agent if preferred
+
+steps:
+- script: |
+    echo Fetching the latest commit hash...
+    git rev-parse HEAD > latest_commit.txt
+    set /p latest_commit=<latest_commit.txt
     echo Latest commit hash: %latest_commit%
 
     echo Running Gitleaks...
     gitleaks detect --commit=%latest_commit%
+  displayName: 'Fetch latest commit and run Gitleaks'
+
   displayName: 'Fetch latest commit and run Gitleaks'
