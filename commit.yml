@@ -1,32 +1,28 @@
 trigger:
-- main  # or your default branch
+- main  # Adjust as needed
+
+pr:
+- '*'
 
 pool:
   vmImage: 'windows-latest'
 
 steps:
-- task: UseDotNet@2
-  inputs:
-    packageType: 'sdk'
-    version: '5.x'  # or the .NET version you need
-    installationPath: $(Agent.ToolsDirectory)/dotnet
+- checkout: self  # Checkout the repository
 
 - script: |
-    trigger:
-- main  # Replace with your branch if necessary
+    echo "Fetching latest commit from main branch..."
+    git fetch origin main
+    set latest_commit_on_main=$(git rev-parse origin/main)
+    echo "Latest commit on main branch: %latest_commit_on_main%"
 
-pool:
-  vmImage: 'windows-latest'  # You can use 'ubuntu-latest' for a Linux agent if preferred
+    echo "Fetching the parent commit of the latest commit on the PR..."
+    git log -n 1 --pretty=format:"%P" > parent_commit.txt
+    for /f %%i in (parent_commit.txt) do set parent_commit=%%i
+    echo "Parent commit ID: %parent_commit%"
 
-steps:
-- script: |
-    echo Fetching the latest commit hash...
-    git rev-parse HEAD > latest_commit.txt
-    set /p latest_commit=<latest_commit.txt
-    echo Latest commit hash: %latest_commit%
-
-    echo Running Gitleaks...
-    gitleaks detect --commit=%latest_commit%
-  displayName: 'Fetch latest commit and run Gitleaks'
-
-  displayName: 'Fetch latest commit and run Gitleaks'
+    echo "Running Gitleaks..."
+    gitleaks detect --commit=%parent_commit%
+  displayName: 'Fetch parent commit and run Gitleaks'
+  env:
+    GITLEAKS_VERSION: 'latest'
