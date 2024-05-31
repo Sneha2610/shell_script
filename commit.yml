@@ -11,13 +11,12 @@ steps:
 - checkout: self  # Checkout the repository
 
 - script: |
-    echo "Fetching latest commit from main branch..."
-    git fetch origin main
-    set latest_commit_on_main=$(git rev-parse origin/main)
-    echo "Latest commit on main branch: %latest_commit_on_main%"
+    echo "Fetching the latest commit in the PR branch..."
+    set latest_commit=%BUILD_SOURCEVERSION%
+    echo "Latest commit in PR: %latest_commit%"
 
-    echo "Fetching the parent commit of the latest commit on the PR..."
-    git log -n 1 --pretty=format:"%P" > parent_commit.txt
+    echo "Fetching the parent commit ID of the latest commit in the PR branch..."
+    git show -s --pretty=%P %latest_commit% > parent_commit.txt
     for /f %%i in (parent_commit.txt) do set parent_commit=%%i
     echo "Parent commit ID: %parent_commit%"
 
