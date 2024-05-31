@@ -1,33 +1,9 @@
-trigger:
-- main  # Adjust as needed
-
-pr:
-- '*'
-
-pool:
-  vmImage: 'windows-latest'
-
-steps:
-- checkout: self  # Checkout the repository
-
-- script: |
     echo "Fetching the latest commit in the PR branch..."
     set latest_commit=%BUILD_SOURCEVERSION%
     echo Latest commit in PR: %latest_commit%
 
-    echo Fetching the parent commit ID of the latest commit in the PR branch...
+    echo "Fetching the parent commit ID of the latest commit in the PR branch..."
     git show -s --format="%%P" %latest_commit% > parent_commit.txt
     type parent_commit.txt  # Print the contents of the parent_commit.txt file for debugging
 
-    set parent_commit=
-    for /F "tokens=*" %%i in (parent_commit.txt) do (
-        set parent_commit=%%i
-    )
-
-    echo Parent commit ID: %parent_commit%
-
-    echo Running Gitleaks...
-    gitleaks detect --commit=%parent_commit%
-  displayName: 'Fetch parent commit and run Gitleaks'
-  env:
-    GITLEAKS_VERSION: 'latest'
+    for /f %%i in (parent_commit.txt) do set parent_commit=%%i
