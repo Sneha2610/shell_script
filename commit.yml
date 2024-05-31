@@ -13,14 +13,14 @@ steps:
 - script: |
     echo "Fetching the latest commit in the PR branch..."
     set latest_commit=%BUILD_SOURCEVERSION%
-    echo "Latest commit in PR: %latest_commit%"
+    echo Latest commit in PR: %latest_commit%
 
-    echo "Fetching the parent commit ID of the latest commit in the PR branch..."
-    git show -s --pretty=%P %latest_commit% > parent_commit.txt
-    for /f %%i in (parent_commit.txt) do set parent_commit=%%i
-    echo "Parent commit ID: %parent_commit%"
+    echo Fetching the parent commit ID of the latest commit in the PR branch...
+    git show -s --format="%%P" %latest_commit% > parent_commit.txt
+    set /p parent_commit=<parent_commit.txt
+    echo Parent commit ID: %parent_commit%
 
-    echo "Running Gitleaks..."
+    echo Running Gitleaks...
     gitleaks detect --commit=%parent_commit%
   displayName: 'Fetch parent commit and run Gitleaks'
   env:
