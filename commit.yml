@@ -3,7 +3,7 @@
     echo Latest commit in PR: %latest_commit%
 
     echo "Fetching the parent commit ID of the latest commit in the PR branch..."
-    git show -s --format="%%P" %latest_commit% > parent_commit.txt
+    git rev-parse %latest_commit%^ > parent_commit.txt
     type parent_commit.txt  # Print the contents of the parent_commit.txt file for debugging
 
-    for /f %%i in (parent_commit.txt) do set parent_commit=%%i
+    set /p parent_commit=<parent_commit.txt
