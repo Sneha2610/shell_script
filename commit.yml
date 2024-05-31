@@ -17,7 +17,13 @@ steps:
 
     echo Fetching the parent commit ID of the latest commit in the PR branch...
     git show -s --format="%%P" %latest_commit% > parent_commit.txt
-    set /p parent_commit=<parent_commit.txt
+    type parent_commit.txt  # Print the contents of the parent_commit.txt file for debugging
+
+    set parent_commit=
+    for /F "tokens=*" %%i in (parent_commit.txt) do (
+        set parent_commit=%%i
+    )
+
     echo Parent commit ID: %parent_commit%
 
     echo Running Gitleaks...
