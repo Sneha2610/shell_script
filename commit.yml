@@ -1,16 +1,33 @@
-echo "Fetching the latest commit in the PR branch..."
-    set latest_commit=%BUILD_SOURCEVERSION%
-    echo Latest commit in PR: %latest_commit%
+trigger:
+- main  # Adjust as needed
 
-    echo "Fetching the parent commit ID of the latest commit in the PR branch..."
-    git log -1 --pretty=format:"%P" %latest_commit% > parent_commit.txt
-    echo Contents of parent_commit.txt:
-    type parent_commit.txt
+pr:
+- '*'
 
-    set /p parent_commit=<parent_commit.txt
-    echo Parent commit ID: %parent_commit%
+pool:
+  vmImage: 'windows-latest'
 
-    if "%parent_commit%"=="" (
-      echo "Error: Failed to fetch parent commit ID."
-      exit /b 1
-    )
+steps:
+- checkout: self  # Checkout the primary repository
+
+- script: |
+    echo "==== Current working directory ===="
+    cd
+    echo "==== Directory contents ===="
+    dir
+
+    echo "Fetching the latest commit in the repository..."
+    git fetch --all
+    git log -1 --pretty=format:"%H" > latest_commit.txt || (echo "Error: Failed to get latest commit ID" && exit /b 1)
+
+    echo "Contents of latest_commit.txt:"
+    type latest_commit.txt || (echo "Error: latest_commit.txt not found or empty" && exit /b 1)
+
+    set /p latest_commit=<latest_commit.txt
+    echo Latest commit ID: %latest_commit%
+
+    echo "Running Gitleaks..."
+    gitleaks detect --commit=%latest_commit% || (echo "Error: Gitleaks command failed" && exit /b 1)
+  displayName: 'Fetch latest commit and run Gitleaks'
+  env:
+    GITLEAKS_VERSION: 'latest'
