@@ -1,0 +1,45 @@
+trigger:
+- main  # Adjust as needed
+
+pr:
+- '*'
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  sourceBranch: ''  # This will be set manually when running the pipeline
+
+steps:
+- checkout: self  # Checkout the primary repository
+  persistCredentials: true  # Ensure credentials are persisted
+
+- script: |
+    echo "==== Current working directory ===="
+    cd
+    echo "==== Directory contents ===="
+    dir
+
+    echo "Fetching the latest commit from the specified source branch..."
+    echo "Source branch: $(sourceBranch)"
+
+    if "$(sourceBranch)"=="" (
+      echo "Error: Source branch is not specified."
+      exit /b 1
+    )
+
+    echo "Fetching the latest commit from the source branch..."
+    git fetch origin $(sourceBranch) || (echo "Error: Failed to fetch source branch" && exit /b 1)
+    git log -1 --pretty=format:"%%H" origin/$(sourceBranch) > latest_commit.txt || (echo "Error: Failed to get latest commit ID from source branch" && exit /b 1)
+
+    echo "Contents of latest_commit.txt:"
+    type latest_commit.txt || (echo "Error: latest_commit.txt not found or empty" && exit /b 1)
+
+    set /p latest_commit=<latest_commit.txt
+    echo Latest commit ID from source branch: %latest_commit%
+
+    echo "Running Gitleaks..."
+    gitleaks detect --commit=%latest_commit% || (echo "Error: Gitleaks command failed" && exit /b 1)
+  displayName: 'Fetch latest commit from specified source branch and run Gitleaks'
+  env:
+    GITLEAKS_VERSION: 'latest'
