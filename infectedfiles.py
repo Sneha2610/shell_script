@@ -1,136 +1,111 @@
 import re
-import json
 
-# Function to extract scan summary from log
-def extract_scan_summary(log):
-    match = re.search(r'ClamAV Scan Summary:(.*)\[', log, re.DOTALL)
-    if match:
-        return json.loads(match.group(1).strip())
-    else:
-        return None
+def extract_summary(log_file):
+    summary = {}
+    scanned_files = []
+    
+    # Regex patterns
+    summary_pattern = re.compile(
+        r'Known viruses:\s+(\d+)|Engine version:\s+([\d.]+)|Scanned directories:\s+(\d+)|'
+        r'Scanned files:\s+(\d+)|Infected files:\s+(\d+)|Data scanned:\s+([\d.]+\s+\w+)|'
+        r'Data read:\s+([\d.]+\s+\w+)|Time:\s+([\d.]+\s+sec\s+\([\d\w\s]+\))'
+    )
+    scanned_pattern = re.compile(r'^(.*?):\s+(.*?\sFOUND|OK)$', re.MULTILINE)
+    
+    with open(log_file, 'r') as file:
+        log_content = file.read()
 
-# Function to extract scanned files from log
-def extract_scanned_files(log):
-    match = re.search(r'Scanned Files:(.*)', log, re.DOTALL)
-    if match:
-        return json.loads(match.group(1).strip())
-    else:
-        return None
+        # Extract summary information
+        for match in summary_pattern.finditer(log_content):
+            if match.group(1):
+                summary['known_viruses'] = match.group(1)
+            if match.group(2):
+                summary['engine_version'] = match.group(2)
+            if match.group(3):
+                summary['scanned_directories'] = match.group(3)
+            if match.group(4):
+                summary['scanned_files'] = match.group(4)
+            if match.group(5):
+                summary['infected_files'] = match.group(5)
+            if match.group(6):
+                summary['data_scanned'] = match.group(6)
+            if match.group(7):
+                summary['data_read'] = match.group(7)
+            if match.group(8):
+                summary['time'] = match.group(8)
+        
+        # Extract scanned file details
+        scanned_files = scanned_pattern.findall(log_content)
+        
+    return summary, scanned_files
 
-# Function to generate HTML report
-def generate_html_report(scan_summary, scanned_files):
-    html_content = """
-    <!DOCTYPE html>
+def generate_html_report(summary, scanned_files):
+    html_content = f"""
     <html>
     <head>
         <title>ClamAV Scan Report</title>
         <style>
-            body {
+            table {{
                 font-family: Arial, sans-serif;
-                background-color: #f0f0f0;
-                padding: 20px;
-            }
-            h2 {
-                color: #333;
-            }
-            .container {
-                max-width: 800px; /* Adjust max-width as needed */
-                margin: 0 auto; /* Center align container */
-            }
-            .summary-table, .scanned-files {
-                width: 100%;
-                background-color: #fff;
-                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
                 border-collapse: collapse;
-                margin-bottom: 20px;
-            }
-            .summary-table th, .summary-table td, .scanned-files th, .scanned-files td {
-                border: 1px solid #ddd;
-                padding: 8px;
+                width: 80%;
+                margin: 20px auto;
+            }}
+            th, td {{
+                border: 1px solid #dddddd;
                 text-align: left;
-            }
-            .summary-table th {
+                padding: 8px;
+            }}
+            th {{
                 background-color: #f2f2f2;
-                color: #333;
-            }
-            .scanned-files th {
-                background-color: #e57373;
-                color: #fff;
-            }
-            .scanned-files td {
-                background-color: #ffcdd2;
-                color: #333;
-            }
-            .highlight {
+            }}
+            .infected-files {{
+                border-collapse: collapse;
+                width: 80%;
+                margin: 20px auto;
+            }}
+            .infected-files th, .infected-files td {{
+                border: 1px solid #dddddd;
+                text-align: left;
+                padding: 8px;
+            }}
+            .infected-files th {{
+                background-color: #f2f2f2;
                 color: red;
-                font-weight: bold;
-            }
+            }}
         </style>
     </head>
     <body>
-        <div class="container">
-            <h2>ClamAV Scan Summary</h2>
-            <table class="summary-table">
-                <tr><th>Attribute</th><th>Value</th></tr>
-    """
-
-    # Populate summary table
-    for key, value in scan_summary.items():
-        html_content += f"<tr><td>{key}</td><td>{value}</td></tr>"
-
+        <h2>ClamAV Scan Summary</h2>
+        <table>
+            <tr><th>Attribute</th><th>Value</th></tr>
+            <tr><td>Known Viruses</td><td>{summary.get('known_viruses', 'N/A')}</td></tr>
+            <tr><td>Engine Version</td><td>{summary.get('engine_version', 'N/A')}</td></tr>
+            <tr><td>Scanned Directories</td><td>{summary.get('scanned_directories', 'N/A')}</td></tr>
+            <tr><td>Scanned Files</td><td>{summary.get('scanned_files', 'N/A')}</td></tr>
+            <tr><td>Infected Files</td><td>{summary.get('infected_files', 'N/A')}</td></tr>
+            <tr><td>Data Scanned</td><td>{summary.get('data_scanned', 'N/A')}</td></tr>
+            <tr><td>Data Read</td><td>{summary.get('data_read', 'N/A')}</td></tr>
+            <tr><td>Time</td><td>{summary.get('time', 'N/A')}</td></tr>
+        </table>
+        <h2>Scanned Files</h2>
+        <table class="scanned-files">
+            <tr><th>File</th><th>Virus Found</th></tr>"""
+    
+    for file, status in scanned_files:
+        virus_found = "Yes" if "FOUND" in status else "No"
+        html_content += f"<tr><td>{file}</td><td>{virus_found}</td></tr>"
+    
     html_content += """
-            </table>
-
-            <h2>Scanned Files</h2>
-            <table class="scanned-files">
-                <tr><th>File</th><th>Virus Found</th></tr>
-    """
-
-    # Populate scanned files table
-    for file_data in scanned_files:
-        virus_found = file_data["Virus Found"]
-        if virus_found == "Yes":
-            html_content += f'<tr><td>{file_data["File"]}</td><td class="highlight">{virus_found}</td></tr>'
-        else:
-            html_content += f'<tr><td>{file_data["File"]}</td><td>{virus_found}</td></tr>'
-
-    html_content += """
-            </table>
-        </div>
+        </table>
     </body>
     </html>
     """
+    
+    with open("clamav_report.html", "w") as report_file:
+        report_file.write(html_content)
 
-    return html_content
-
-# Function to read ClamAV log file
-def read_clamav_log(log_file):
-    with open(log_file, 'r') as file:
-        return file.read()
-
-# Main function to generate report
-def main():
-    # Specify path to ClamAV log file
-    log_file = 'clam.log'
-
-    # Read ClamAV log data
-    clam_log = read_clamav_log(log_file)
-
-    # Extract scan summary and scanned files
-    scan_summary = extract_scan_summary(clam_log)
-    scanned_files = extract_scanned_files(clam_log)
-
-    # Generate HTML report
-    if scan_summary and scanned_files:
-        report_html = generate_html_report(scan_summary, scanned_files)
-
-        # Write HTML report to a file
-        with open("clamav_scan_report.html", "w") as file:
-            file.write(report_html)
-
-        print("HTML report generated successfully.")
-    else:
-        print("Failed to extract scan summary or scanned files from the ClamAV log.")
-
-if __name__ == "__main__":
-    main()
+# Extract summary and generate report
+log_file_path = 'clam.log'
+summary, scanned_files = extract_summary(log_file_path)
+generate_html_report(summary, scanned_files)
