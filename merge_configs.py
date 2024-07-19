@@ -1,25 +1,24 @@
-import toml
+import tomli
+import tomli_w
 import os
 
 def merge_configs(base_config_path, repo_config_path, output_path):
     try:
         # Load the base configuration (global config)
         print(f"Loading base configuration from {base_config_path}")
-        with open(base_config_path, 'r') as base_file:
-            base_config = toml.load(base_file)
-        print("Base configuration loaded successfully.")
+        with open(base_config_path, 'rb') as base_file:
+            base_content = base_file.read()
+            print("Base configuration content:")
+            print(base_content.decode('utf-8'))
+            base_config = tomli.loads(base_content.decode('utf-8'))
         
         # Load the repository-specific configuration (allowlist)
         print(f"Loading repository-specific configuration from {repo_config_path}")
-        with open(repo_config_path, 'r') as repo_file:
-            repo_config = toml.load(repo_file)
-        print("Repository-specific configuration loaded successfully.")
-        
-        # Print loaded configurations for debugging
-        print("Base configuration content:")
-        print(base_config)
-        print("Repository-specific configuration content:")
-        print(repo_config)
+        with open(repo_config_path, 'rb') as repo_file:
+            repo_content = repo_file.read()
+            print("Repository-specific configuration content:")
+            print(repo_content.decode('utf-8'))
+            repo_config = tomli.loads(repo_content.decode('utf-8'))
         
         # Ensure 'allowlist' key exists in base_config
         if 'allowlist' not in base_config:
@@ -44,13 +43,13 @@ def merge_configs(base_config_path, repo_config_path, output_path):
         
         # Save the merged configuration
         with open(output_path, 'w') as output_file:
-            toml.dump(base_config, output_file)
+            tomli_w.dump(base_config, output_file)
         print(f"Configuration merged successfully into {output_path}")
     
     except FileNotFoundError as e:
         print(f"Error: {e}")
         exit(1)
-    except toml.TomlDecodeError as e:
+    except tomli.TOMLDecodeError as e:
         print(f"Error parsing TOML file: {e}")
         exit(1)
     except Exception as e:
