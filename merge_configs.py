@@ -1,47 +1,65 @@
 import toml
-import sys
+import os
 
 def merge_configs(base_config_path, repo_config_path, output_path):
-    # Load the base configuration (global config)
-    with open(base_config_path, 'r') as base_file:
-        base_config = toml.load(base_file)
-    
-    # Load the repository-specific configuration (allowlist)
-    with open(repo_config_path, 'r') as repo_file:
-        repo_config = toml.load(repo_file)
-    
-    # Merge the allowlists
-    if 'allowlist' in base_config and 'allowlist' in repo_config:
-        # Merge paths, ensuring no duplicates
-        base_paths = set(base_config['allowlist'].get('paths', []))
-        repo_paths = set(repo_config['allowlist'].get('paths', []))
-        merged_paths = list(base_paths | repo_paths)
-        base_config['allowlist']['paths'] = merged_paths
+    try:
+        # Load the base configuration (global config)
+        with open(base_config_path, 'r') as base_file:
+            base_config = toml.load(base_file)
         
-        # Merge regexes, ensuring no duplicates
-        base_regexes = set(base_config['allowlist'].get('regexes', []))
-        repo_regexes = set(repo_config['allowlist'].get('regexes', []))
-        merged_regexes = list(base_regexes | repo_regexes)
-        base_config['allowlist']['regexes'] = merged_regexes
+        # Load the repository-specific configuration (allowlist)
+        with open(repo_config_path, 'r') as repo_file:
+            repo_config = toml.load(repo_file)
         
-        # Optionally merge descriptions (if needed)
-        if 'description' in repo_config['allowlist']:
-            base_config['allowlist']['description'] = repo_config['allowlist']['description']
-    elif 'allowlist' in repo_config:
-        # If there's no allowlist in the base config, use the repo's allowlist
-        base_config['allowlist'] = repo_config['allowlist']
+        # Ensure 'allowlist' key exists in base_config
+        if 'allowlist' not in base_config:
+            base_config['allowlist'] = {}
+        
+        # Merge the allowlists
+        if 'allowlist' in repo_config:
+            if 'paths' in repo_config['allowlist']:
+                base_paths = set(base_config['allowlist'].get('paths', []))
+                repo_paths = set(repo_config['allowlist'].get('paths', []))
+                merged_paths = list(base_paths | repo_paths)
+                base_config['allowlist']['paths'] = merged_paths
+            
+            if 'regexes' in repo_config['allowlist']:
+                base_regexes = set(base_config['allowlist'].get('regexes', []))
+                repo_regexes = set(repo_config['allowlist'].get('regexes', []))
+                merged_regexes = list(base_regexes | repo_regexes)
+                base_config['allowlist']['regexes'] = merged_regexes
+            
+            if 'description' in repo_config['allowlist']:
+                base_config['allowlist']['description'] = repo_config['allowlist']['description']
+        
+        # Save the merged configuration
+        with open(output_path, 'w') as output_file:
+            toml.dump(base_config, output_file)
+        print(f"Configuration merged successfully into {output_path}")
     
-    # Save the merged configuration
-    with open(output_path, 'w') as output_file:
-        toml.dump(base_config, output_file)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        exit(1)
+    except toml.TomlDecodeError as e:
+        print(f"Error parsing TOML file: {e}")
+        exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("Usage: python merge_configs.py <base_config_path> <repo_config_path> <output_path>")
-        sys.exit(1)
+    # Define file paths
+    base_config_path = 'rules.toml'
+    repo_config_path = 'gitleaks.toml'
+    output_path = 'combined_gitleaks.toml'
+
+    # Ensure the files exist before proceeding
+    if not os.path.exists(base_config_path):
+        print(f"Base config file '{base_config_path}' does not exist.")
+        exit(1)
     
-    base_config_path = sys.argv[1]
-    repo_config_path = sys.argv[2]
-    output_path = sys.argv[3]
+    if not os.path.exists(repo_config_path):
+        print(f"Repository config file '{repo_config_path}' does not exist.")
+        exit(1)
 
     merge_configs(base_config_path, repo_config_path, output_path)
