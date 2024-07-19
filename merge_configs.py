@@ -4,12 +4,22 @@ import os
 def merge_configs(base_config_path, repo_config_path, output_path):
     try:
         # Load the base configuration (global config)
+        print(f"Loading base configuration from {base_config_path}")
         with open(base_config_path, 'r') as base_file:
             base_config = toml.load(base_file)
+        print("Base configuration loaded successfully.")
         
         # Load the repository-specific configuration (allowlist)
+        print(f"Loading repository-specific configuration from {repo_config_path}")
         with open(repo_config_path, 'r') as repo_file:
             repo_config = toml.load(repo_file)
+        print("Repository-specific configuration loaded successfully.")
+        
+        # Print loaded configurations for debugging
+        print("Base configuration content:")
+        print(base_config)
+        print("Repository-specific configuration content:")
+        print(repo_config)
         
         # Ensure 'allowlist' key exists in base_config
         if 'allowlist' not in base_config:
