@@ -9,27 +9,37 @@ variables:
   GITLEAKS_VERSION: '8.0.0'
 
 jobs:
-- job: ReadAndRunScans
-  displayName: 'Read Repository List and Run Gitleaks Scans'
+- job: ReadRepoList
+  displayName: 'Read Repository List'
   steps:
+  - checkout: self
+
   - script: |
       echo "Reading repository list from $(REPO_LIST_FILE)..."
       REPOS=$(cat $(REPO_LIST_FILE))
       
-      # Convert repository names to a format that can be used in YAML conditions
-      IFS=$'\n' REPO_ARRAY=($REPOS)
-      for REPO in "${REPO_ARRAY[@]}"; do
-        echo "##vso[task.setvariable variable=REPO_$REPO;isOutput=true]$REPO"
+      # Write each repo name as a new line in a file
+      echo "$REPOS" | while read REPO; do
+        echo $REPO >> repo-names.txt
       done
-    displayName: 'Read Repository List'
+    displayName: 'Generate Repository List'
 
-  - ${{ each repo in variables['REPO_LIST_FILE'].split('\n') }}:
-    - script: |
-        REPO_NAME=$REPO
-        echo "Checking out repository: $REPO_NAME"
-        echo "##vso[checkout repository=$REPO_NAME]"
-        
-        echo "Running Gitleaks on repository: $REPO_NAME"
-        docker run --rm -v $(Build.SourcesDirectory)/$REPO_NAME:/repo zricethezav/gitleaks:$(GITLEAKS_VERSION) detect -s /repo
-      displayName: 'Run Gitleaks Scan'
-      condition: eq(variables['REPO_NAME'], 'true')
+- job: RunGitleaksScans
+  displayName: 'Run Gitleaks Scans for All Repositories'
+  dependsOn: ReadRepoList
+  strategy:
+    parallel: 5  # Adjust the number based on your requirement
+  steps:
+  - checkout: self
+
+  - script: |
+      REPOS=$(cat repo-names.txt)
+      
+      echo "Starting Gitleaks scans..."
+      echo "$REPOS" | while read REPO; do
+        echo "Running scan for repository: $REPO"
+        # Trigger the template for each repo
+        echo "##vso[task.setvariable variable=repoName;isOutput=true]$REPO"
+        echo "##vso[build.queue] YourPipelineName --template gitleaks-scan-template.yml --parameters repoName=$REPO"
+      done
+    displayName: 'Run Scans using Template'
