@@ -26,7 +26,7 @@ steps:
       mv gitleaks-linux-amd64 /usr/local/bin/gitleaks
     fi
 
-    # Read each line in repo.txt
+    # Read each line in repo.txt and run Gitleaks scan
     while IFS= read -r folder; do
       # Check if the folder exists
       if [ -d "$folder" ]; then
@@ -34,6 +34,7 @@ steps:
         report_file="${report_dir}/$(basename "$folder")-gitleaks-report.json"
         
         # Run Gitleaks scan
+        echo "Running Gitleaks on $folder"
         gitleaks detect --source="$folder" --report="$report_file"
         
         echo "Gitleaks report for $folder saved to $report_file"
@@ -41,7 +42,7 @@ steps:
         echo "Folder $folder does not exist. Skipping."
       fi
     done < "$repo_file"
-  displayName: 'Run Gitleaks Scan with Shell Script'
+  displayName: 'Run Gitleaks Scan for Each Folder'
 
 - task: PublishPipelineArtifact@1
   inputs:
