@@ -9,8 +9,8 @@ variables:
   GITLEAKS_VERSION: '8.0.0'
 
 stages:
-- stage: ReadRepoList
-  displayName: 'Read Repository List and Generate Jobs'
+- stage: RunGitleaksScans
+  displayName: 'Run Gitleaks Scans for All Repositories'
   jobs:
   - job: ReadRepoList
     displayName: 'Read Repository List'
@@ -22,17 +22,28 @@ stages:
     - script: |
         echo "Reading repository list from $(REPO_LIST_FILE)..."
         REPOS=$(cat $(REPO_LIST_FILE))
-        
-        echo "repositories:"
         echo "$REPOS" | while read REPO; do
-          echo "  - $REPO"
-        done > repositories.yml
+          echo "##vso[task.setvariable variable=REPO_LIST;isOutput=true]$REPO"
+        done
       displayName: 'Generate Repository List'
+    name: ReadRepoList
 
-- stage: RunGitleaksScans
-  displayName: 'Run Gitleaks Scans for All Repositories'
-  dependsOn: ReadRepoList
-  jobs:
-  - template: gitleaks-scan-template.yml
-    parameters:
-      repoName: ${{ each repo in fromYaml('repositories.yml').repositories }}
+  - job: RunGitleaks
+    displayName: 'Run Gitleaks Scans'
+    dependsOn: ReadRepoList
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+
+    - script: |
+        REPOS=$(cat $(Build.SourcesDirectory)/$(REPO_LIST_FILE))
+        for REPO in $REPOS; do
+          echo "Triggering Gitleaks scan for repository: $REPO"
+          echo "name: $REPO"
+          echo "parameters:"
+          echo "  repoName: $REPO"
+        done > gitleaks-scan-steps.yml
+      displayName: 'Generate Gitleaks Scan Steps'
+
+    - template: gitleaks-scan-steps.yml
