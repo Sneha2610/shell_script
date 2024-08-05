@@ -8,38 +8,31 @@ variables:
   REPO_LIST_FILE: 'repo-list.txt'
   GITLEAKS_VERSION: '8.0.0'
 
-jobs:
-- job: ReadRepoList
-  displayName: 'Read Repository List'
-  steps:
-  - checkout: self
+stages:
+- stage: ReadRepoList
+  displayName: 'Read Repository List and Generate Jobs'
+  jobs:
+  - job: ReadRepoList
+    displayName: 'Read Repository List'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
 
-  - script: |
-      echo "Reading repository list from $(REPO_LIST_FILE)..."
-      REPOS=$(cat $(REPO_LIST_FILE))
-      
-      # Write each repo name as a new line in a file
-      echo "$REPOS" | while read REPO; do
-        echo $REPO >> repo-names.txt
-      done
-    displayName: 'Generate Repository List'
+    - script: |
+        echo "Reading repository list from $(REPO_LIST_FILE)..."
+        REPOS=$(cat $(REPO_LIST_FILE))
+        
+        echo "repositories:"
+        echo "$REPOS" | while read REPO; do
+          echo "  - $REPO"
+        done > repositories.yml
+      displayName: 'Generate Repository List'
 
-- job: RunGitleaksScans
+- stage: RunGitleaksScans
   displayName: 'Run Gitleaks Scans for All Repositories'
   dependsOn: ReadRepoList
-  strategy:
-    parallel: 5  # Adjust the number based on your requirement
-  steps:
-  - checkout: self
-
-  - script: |
-      REPOS=$(cat repo-names.txt)
-      
-      echo "Starting Gitleaks scans..."
-      echo "$REPOS" | while read REPO; do
-        echo "Running scan for repository: $REPO"
-        # Trigger the template for each repo
-        echo "##vso[task.setvariable variable=repoName;isOutput=true]$REPO"
-        echo "##vso[build.queue] YourPipelineName --template gitleaks-scan-template.yml --parameters repoName=$REPO"
-      done
-    displayName: 'Run Scans using Template'
+  jobs:
+  - template: gitleaks-scan-template.yml
+    parameters:
+      repoName: ${{ each repo in fromYaml('repositories.yml').repositories }}
