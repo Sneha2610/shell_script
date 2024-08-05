@@ -15,13 +15,21 @@ jobs:
   - script: |
       echo "Reading repository list from $(REPO_LIST_FILE)..."
       REPOS=$(cat $(REPO_LIST_FILE))
-      echo "Repositories: $REPOS"
       
-      # Split repositories by newline and set them as a pipeline variable
-      echo "##vso[task.setvariable variable=REPO_LIST;]$REPOS"
+      # Convert repository names to a format that can be used in YAML conditions
+      IFS=$'\n' REPO_ARRAY=($REPOS)
+      for REPO in "${REPO_ARRAY[@]}"; do
+        echo "##vso[task.setvariable variable=REPO_$REPO;isOutput=true]$REPO"
+      done
     displayName: 'Read Repository List'
 
-  - ${{ each repo in variables.REPO_LIST.split('\n') }}:
-    - template: gitleaks-scan-template.yml
-      parameters:
-        repoName: ${{ repo }}
+  - ${{ each repo in variables['REPO_LIST_FILE'].split('\n') }}:
+    - script: |
+        REPO_NAME=$REPO
+        echo "Checking out repository: $REPO_NAME"
+        echo "##vso[checkout repository=$REPO_NAME]"
+        
+        echo "Running Gitleaks on repository: $REPO_NAME"
+        docker run --rm -v $(Build.SourcesDirectory)/$REPO_NAME:/repo zricethezav/gitleaks:$(GITLEAKS_VERSION) detect -s /repo
+      displayName: 'Run Gitleaks Scan'
+      condition: eq(variables['REPO_NAME'], 'true')
