@@ -1,0 +1,27 @@
+trigger:
+- '*'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  REPO_LIST_FILE: 'repo-list.txt'
+  GITLEAKS_VERSION: '8.0.0'
+
+jobs:
+- job: ReadAndRunScans
+  displayName: 'Read Repository List and Run Gitleaks Scans'
+  steps:
+  - script: |
+      echo "Reading repository list from $(REPO_LIST_FILE)..."
+      REPOS=$(cat $(REPO_LIST_FILE))
+      echo "Repositories: $REPOS"
+      
+      # Split repositories by newline and set them as a pipeline variable
+      echo "##vso[task.setvariable variable=REPO_LIST;]$REPOS"
+    displayName: 'Read Repository List'
+
+  - ${{ each repo in variables.REPO_LIST.split('\n') }}:
+    - template: gitleaks-scan-template.yml
+      parameters:
+        repoName: ${{ repo }}
