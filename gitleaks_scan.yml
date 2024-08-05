@@ -7,10 +7,6 @@ pool:
 steps:
 - checkout: self
 
-- task: UsePythonVersion@0
-  inputs:
-    versionSpec: '3.x'  # Adjust as needed
-
 - script: |
     #!/bin/bash
 
@@ -20,6 +16,15 @@ steps:
     # Directory where reports will be saved
     report_dir="gitleaks-reports"
     mkdir -p "$report_dir"
+
+    # Install Gitleaks if it's not already installed
+    if ! command -v gitleaks &> /dev/null
+    then
+      echo "Gitleaks not found, installing..."
+      wget https://github.com/gitleaks/gitleaks/releases/download/v8.0.0/gitleaks-linux-amd64
+      chmod +x gitleaks-linux-amd64
+      mv gitleaks-linux-amd64 /usr/local/bin/gitleaks
+    fi
 
     # Read each line in repo.txt
     while IFS= read -r folder; do
@@ -36,7 +41,7 @@ steps:
         echo "Folder $folder does not exist. Skipping."
       fi
     done < "$repo_file"
-  displayName: 'Run Gitleaks Scan'
+  displayName: 'Run Gitleaks Scan with Shell Script'
 
 - task: PublishPipelineArtifact@1
   inputs:
