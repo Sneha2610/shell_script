@@ -8,13 +8,16 @@ steps:
 - checkout: self
 
 - script: |
-    # Read each line in file.txt and create a variable for each file
-    while IFS= read -r file; do
-      echo "##vso[task.setvariable variable=filelist]$file,$(filelist)"
+    echo "##vso[task.setvariable variable=filecount]0"
+    i=0
+    while IFS= read -r repo; do
+      echo "##vso[task.setvariable variable=file_${i}]$repo"
+      i=$((i + 1))
     done < file.txt
-  displayName: 'Prepare file list'
+    echo "##vso[task.setvariable variable=filecount]$i"
+  displayName: 'Read repo names from file.txt and set variables'
 
-- ${{ each file in variables.filelist.split(',') }}:
+- ${{ each i in range(0, variables.filecount) }}:
   - template: gitleaks-template.yml
     parameters:
-      filePath: ${{ file }}
+      repoName: ${{ variables['file_' + format('{0}', i)] }}
