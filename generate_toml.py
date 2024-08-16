@@ -21,13 +21,15 @@ def generate_toml_from_lines(input_file, output_file):
     # Create a TOML document using tomlkit
     doc = tomlkit.document()
     allowlist = tomlkit.table()
-    allowlist.add("description", "allowlist pattern")
+    allowlist["description"] = "allowlist pattern"
 
-    # Replace double quotes with triple single quotes in the regex patterns
-    allowlist.add("regex", [f"'''{pattern}'''" for pattern in regex_patterns])
-    doc.add("allowlist", allowlist)
+    # Add the regex patterns with triple single quotes
+    regex_patterns_formatted = [f"'''{pattern}'''" for pattern in regex_patterns]
+    allowlist["regex"] = regex_patterns_formatted
+    
+    doc["allowlist"] = allowlist
 
-    # Write the TOML document to a file
+    # Write the TOML document to a file with proper formatting
     with open(output_file, 'w') as f:
         f.write(tomlkit.dumps(doc))
 
