@@ -1,14 +1,15 @@
 import re
-import tomlkit
 
 def escape_special_characters(line):
-    # Escape special characters but avoid double escaping backslashes
+    # Escape only the special characters .*+-^$\\?|\[]()
     special_characters = r".*+-^$\\?|\[]()"
+    
+    # Use re.escape and then selectively remove escapes we don't want
     escaped_line = re.escape(line)
     
-    # Replace double backslashes with a single backslash
-    escaped_line = escaped_line.replace(r"\\", r"\\")
-
+    # Replace escaped curly braces back to normal since they shouldn't be escaped
+    escaped_line = escaped_line.replace(r"\{", "{").replace(r"\}", "}")
+    
     return escaped_line
 
 def generate_toml_from_lines(input_file, output_file):
@@ -18,24 +19,24 @@ def generate_toml_from_lines(input_file, output_file):
     # Generate regex patterns by escaping special characters
     regex_patterns = [escape_special_characters(line.strip()) for line in lines]
 
-    # Create a TOML document using tomlkit
-    doc = tomlkit.document()
-    allowlist = tomlkit.table()
-    allowlist["description"] = "allowlist pattern"
-
-    # Add the regex patterns with triple single quotes
-    regex_patterns_formatted = [f"'''{pattern}'''" for pattern in regex_patterns]
-    allowlist["regex"] = regex_patterns_formatted
+    # Manually format the TOML content
+    toml_content = "[allowlist]\n"
+    toml_content += 'description = "allowlist pattern"\n'
+    toml_content += "regex = [\n"
     
-    doc["allowlist"] = allowlist
+    # Add each regex pattern with triple single quotes and proper indentation
+    for pattern in regex_patterns:
+        toml_content += f"    '''{pattern}''',\n"
+    
+    toml_content += "]\n"
 
-    # Write the TOML document to a file with proper formatting
+    # Write the formatted TOML content to a file
     with open(output_file, 'w') as f:
-        f.write(tomlkit.dumps(doc))
+        f.write(toml_content)
 
 if __name__ == "__main__":
-    input_file = "patterns.txt"
-    output_file = "allowlist_pattern.toml"
+    input_file = "patterns.txt"  # Input text file with lines to exclude
+    output_file = "allowlist_pattern.toml"  # Output TOML file
 
     generate_toml_from_lines(input_file, output_file)
     print(f"TOML file '{output_file}' generated successfully.")
