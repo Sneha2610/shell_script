@@ -35,7 +35,7 @@ def generate_toml_from_lines(input_file, output_file):
         f.write(toml_content)
 
 if __name__ == "__main__":
-    input_file = "patterns.txt"  # Input text file with lines to exclude
+    input_file = "password.txt"  # Input text file with lines to exclude
     output_file = "allowlist_pattern.toml"  # Output TOML file
 
     generate_toml_from_lines(input_file, output_file)
