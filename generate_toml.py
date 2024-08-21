@@ -3,6 +3,10 @@ import re
 def escape_special_characters(line):
     # Escape special characters in regex
     escaped_line = re.escape(line)
+    
+    # Replace single backslashes with double backslashes
+    escaped_line = escaped_line.replace("\\", "\\\\")
+    
     return escaped_line
 
 def generate_toml_from_lines(input_file, output_file):
