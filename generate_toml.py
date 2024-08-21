@@ -1,14 +1,12 @@
 import re
+import toml
 
 def escape_special_characters(line):
-    # Escape only the special characters .*+-^$\\?|\[]()
+    # List of special characters in regex that need to be escaped
     special_characters = r".*+-^$\\?|\[]()"
-    
-    # Use re.escape and then selectively remove escapes we don't want
+
+    # Escape each special character
     escaped_line = re.escape(line)
-    
-    # Replace escaped curly braces back to normal since they shouldn't be escaped
-    escaped_line = escaped_line.replace(r"\{", "{").replace(r"\}", "}")
     
     return escaped_line
 
@@ -19,24 +17,25 @@ def generate_toml_from_lines(input_file, output_file):
     # Generate regex patterns by escaping special characters
     regex_patterns = [escape_special_characters(line.strip()) for line in lines]
 
-    # Manually format the TOML content
-    toml_content = "[allowlist]\n"
-    toml_content += 'description = "allowlist pattern"\n'
-    toml_content += "regex = [\n"
-    
-    # Add each regex pattern with triple single quotes and proper indentation
-    for pattern in regex_patterns:
-        toml_content += f"    '''{pattern}''',\n"
-    
-    toml_content += "]\n"
+    # Format regex patterns to be wrapped in double quotes with escaped backslashes
+    formatted_patterns = [f'"{pattern}"' for pattern in regex_patterns]
 
-    # Write the formatted TOML content to a file
+    # Create a TOML structure
+    data = {
+        "allowlist": {
+            "description": "allowlist pattern",
+            "regex": formatted_patterns
+        }
+    }
+
+    # Write to a TOML file
     with open(output_file, 'w') as f:
-        f.write(toml_content)
+        toml.dump(data, f)
 
 if __name__ == "__main__":
-    input_file = "password.txt"  # Input text file with lines to exclude
+    input_file = "patterns.txt"  # File containing lines to exclude
     output_file = "allowlist_pattern.toml"  # Output TOML file
 
     generate_toml_from_lines(input_file, output_file)
+    
     print(f"TOML file '{output_file}' generated successfully.")
