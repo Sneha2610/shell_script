@@ -1,13 +1,8 @@
 import re
-import toml
 
 def escape_special_characters(line):
-    # List of special characters in regex that need to be escaped
-    special_characters = r".*+-^$\\?|\[]()"
-
-    # Escape each special character
+    # Escape special characters in regex
     escaped_line = re.escape(line)
-    
     return escaped_line
 
 def generate_toml_from_lines(input_file, output_file):
@@ -17,20 +12,20 @@ def generate_toml_from_lines(input_file, output_file):
     # Generate regex patterns by escaping special characters
     regex_patterns = [escape_special_characters(line.strip()) for line in lines]
 
-    # Format regex patterns to be wrapped in double quotes with escaped backslashes
-    formatted_patterns = [f'"{pattern}"' for pattern in regex_patterns]
+    # Manually construct the TOML content
+    toml_content = '[allowlist]\n'
+    toml_content += 'description = "allowlist pattern"\n'
+    toml_content += 'regex = [\n'
+    
+    # Add each regex pattern wrapped in double quotes and properly formatted
+    for pattern in regex_patterns:
+        toml_content += f'    "{pattern}",\n'
+    
+    toml_content += ']\n'
 
-    # Create a TOML structure
-    data = {
-        "allowlist": {
-            "description": "allowlist pattern",
-            "regex": formatted_patterns
-        }
-    }
-
-    # Write to a TOML file
+    # Write the manually constructed TOML content to a file
     with open(output_file, 'w') as f:
-        toml.dump(data, f)
+        f.write(toml_content)
 
 if __name__ == "__main__":
     input_file = "patterns.txt"  # File containing lines to exclude
