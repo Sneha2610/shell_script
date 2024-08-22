@@ -2,13 +2,8 @@ import re
 import toml
 
 def escape_special_characters(line):
-    # List of special characters in regex that need to be escaped
-    special_characters = r".*+-^$\\?|\[]()"
-
-    # Escape each special character in the line
-    escaped_line = re.escape(line)
-    
-    return escaped_line
+    # Escape special characters for regex
+    return re.escape(line)
 
 def remove_duplicates(lines):
     # Remove duplicate lines while preserving order
@@ -34,20 +29,17 @@ def generate_toml_from_lines(input_file, output_file):
     # Format the regex patterns for TOML output
     formatted_patterns = [f"'''{pattern}'''" for pattern in regex_patterns]
 
-    # Create a TOML structure
-    data = {
-        "allowlist": {
-            "description": "allowlist pattern",
-            "regex": formatted_patterns
-        }
-    }
+    # Manually create the TOML content as a string
+    toml_content = "[allowlist]\ndescription = \"allowlist pattern\"\nregex = [\n"
+    toml_content += ",\n".join(formatted_patterns)
+    toml_content += "\n]"
 
-    # Write to a TOML file
+    # Write to the TOML file
     with open(output_file, 'w') as f:
-        toml.dump(data, f)
+        f.write(toml_content)
 
 if __name__ == "__main__":
-    input_file = "patterns.txt"  # File containing lines to exclude
+    input_file = "password.txt"  # File containing lines to exclude
     output_file = "allowlist_pattern.toml"  # Output TOML file
 
     generate_toml_from_lines(input_file, output_file)
