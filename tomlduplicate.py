@@ -1,9 +1,10 @@
 import re
-import toml
 
 def escape_special_characters(line):
-    # Escape special characters for regex
-    return re.escape(line)
+    # Escape special characters for regex and convert single backslashes to double backslashes
+    escaped_line = re.escape(line)
+    escaped_line = escaped_line.replace("\\", "\\\\")
+    return escaped_line
 
 def remove_duplicates(lines):
     # Remove duplicate lines while preserving order
@@ -26,8 +27,8 @@ def generate_toml_from_lines(input_file, output_file):
     # Generate regex patterns by escaping special characters
     regex_patterns = [escape_special_characters(line) for line in unique_lines]
 
-    # Format the regex patterns for TOML output
-    formatted_patterns = [f"'''{pattern}'''" for pattern in regex_patterns]
+    # Format the regex patterns for TOML output using double quotes
+    formatted_patterns = [f'"{pattern}"' for pattern in regex_patterns]
 
     # Manually create the TOML content as a string
     toml_content = "[allowlist]\ndescription = \"allowlist pattern\"\nregex = [\n"
