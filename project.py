@@ -1,21 +1,8 @@
 import json
 
-# Load the JSON data (replace 'your_json_data' with your actual JSON data)
-json_data = '''{
-    "value": [
-        {
-            "id": "project-id-1",
-            "name": "Project Name 1"
-        },
-        {
-            "id": "project-id-2",
-            "name": "Project Name 2"
-        }
-    ],
-    "count": 2
-}'''
-
-data = json.loads(json_data)
+# Load the JSON data from a file (replace 'projects.json' with your actual JSON file name)
+with open('projects.json', 'r') as json_file:
+    data = json.load(json_file)
 
 # Extract project names
 project_names = [project['name'] for project in data['value']]
