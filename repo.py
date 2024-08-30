@@ -1,5 +1,6 @@
 import os
 import requests
+import base64
 
 # Fetch PAT from environment variables
 pat = os.getenv('AZURE_DEVOPS_PAT')
@@ -8,22 +9,28 @@ if not pat:
 
 organization = "your_organization"
 
+# Base64 encode the PAT for basic authentication
+pat_base64 = base64.b64encode(f":{pat}".encode()).decode()
+
 # API URL to fetch all projects
 projects_url = f"https://dev.azure.com/{organization}/_apis/projects?api-version=7.1-preview.4"
 
 # Headers for authentication
 headers = {
     'Content-Type': 'application/json',
-    'Authorization': f'Basic {pat}'
+    'Authorization': f'Basic {pat_base64}'
 }
 
 # Fetch all projects
 response = requests.get(projects_url, headers=headers)
-if response.status_code == 200:
-    projects = response.json()['value']
-else:
+
+# Debugging: Print the status code and content if the request fails
+if response.status_code != 200:
     print(f"Failed to fetch projects: {response.status_code}")
+    print(f"Response content: {response.content.decode()}")
     exit()
+
+projects = response.json()['value']
 
 # Open a text file to write the repository names
 with open('all_repositories.txt', 'w') as file:
@@ -45,5 +52,6 @@ with open('all_repositories.txt', 'w') as file:
                 file.write(f"{project_name}: {repo_name}\n")
         else:
             print(f"Failed to fetch repos for project {project_name}: {repos_response.status_code}")
+            print(f"Response content: {repos_response.content.decode()}")
 
 print("Repository names have been saved to 'all_repositories.txt'")
