@@ -1,0 +1,28 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.x'
+    addToPath: true
+
+- script: |
+    python -m pip install --upgrade pip
+    pip install requests
+  displayName: 'Install dependencies'
+
+- script: |
+    python fetch_repos.py
+  env:
+    AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
+  displayName: 'Run fetch_repos script'
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: 'all_repositories.txt'
+    ArtifactName: 'repos-list'
+  displayName: 'Publish repositories list'
