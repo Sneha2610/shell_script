@@ -1,11 +1,14 @@
+import os
 import requests
-import json
 
-# Replace these with your details
+# Fetch PAT from environment variables
+pat = os.getenv('AZURE_DEVOPS_PAT')
+if not pat:
+    raise ValueError("The PAT is not set as an environment variable.")
+
 organization = "your_organization"
-pat = "your_personal_access_token"
 
-# API URL for projects
+# API URL to fetch all projects
 projects_url = f"https://dev.azure.com/{organization}/_apis/projects?api-version=7.1-preview.4"
 
 # Headers for authentication
@@ -29,7 +32,7 @@ with open('all_repositories.txt', 'w') as file:
         project_name = project['name']
         print(f"Fetching repos for project: {project_name}")
         
-        # API URL for repositories in the current project
+        # API URL to fetch repositories in the current project
         repos_url = f"https://dev.azure.com/{organization}/{project_name}/_apis/git/repositories?api-version=7.1-preview.1"
         
         # Fetch repositories for the project
