@@ -9,12 +9,15 @@ output_csv = 'gitleaks_report.csv'
 gitleaks_report_dir = 'gitleaks_reports'
 
 # Paths to your Gitleaks binary and config file
-gitleaks_binary = 'path/to/gitleaks'  # Adjust this path
-gitleaks_config = 'path/to/gitleaks.toml'  # Adjust this path
+gitleaks_binary = './tools/gitleaks'  # Adjust this path
+gitleaks_config = './tools/gitleaks.toml'  # Adjust this path
 
 # Create a directory to store individual Gitleaks reports
 if not os.path.exists(gitleaks_report_dir):
     os.makedirs(gitleaks_report_dir)
+
+# Personal Access Token for authentication
+pat = os.environ['AZURE_DEVOPS_PAT']
 
 # Read the CSV file
 with open(input_csv, 'r') as csvfile:
@@ -23,9 +26,11 @@ with open(input_csv, 'r') as csvfile:
         project_name = row['Project Name']
         repo_name = row['Repository Name']
 
-        # Clone the repository (assuming you have access to the repo URL)
-        repo_url = f"https://dev.azure.com/your_organization/{project_name}/_git/{repo_name}"
+        # Construct the repository URL with PAT
+        repo_url = f"https://{pat}@dev.azure.com/your_organization/{project_name}/_git/{repo_name}"
         clone_dir = os.path.join(gitleaks_report_dir, repo_name)
+        
+        # Clone the repository
         subprocess.run(['git', 'clone', repo_url, clone_dir])
 
         # Run Gitleaks on the cloned repository using your binary and config
