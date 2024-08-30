@@ -8,6 +8,10 @@ input_csv = 'projects_and_repositories.csv'
 output_csv = 'gitleaks_report.csv'
 gitleaks_report_dir = 'gitleaks_reports'
 
+# Paths to your Gitleaks binary and config file
+gitleaks_binary = 'path/to/gitleaks'  # Adjust this path
+gitleaks_config = 'path/to/gitleaks.toml'  # Adjust this path
+
 # Create a directory to store individual Gitleaks reports
 if not os.path.exists(gitleaks_report_dir):
     os.makedirs(gitleaks_report_dir)
@@ -24,10 +28,11 @@ with open(input_csv, 'r') as csvfile:
         clone_dir = os.path.join(gitleaks_report_dir, repo_name)
         subprocess.run(['git', 'clone', repo_url, clone_dir])
 
-        # Run Gitleaks on the cloned repository
+        # Run Gitleaks on the cloned repository using your binary and config
         gitleaks_output = os.path.join(gitleaks_report_dir, f"{repo_name}_gitleaks.json")
         subprocess.run([
-            'gitleaks', 'detect', '--source', clone_dir,
+            gitleaks_binary, 'detect', '--source', clone_dir,
+            '--config-path', gitleaks_config,
             '--report-format', 'json', '--report-path', gitleaks_output
         ])
 
