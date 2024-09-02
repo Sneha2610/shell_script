@@ -39,4 +39,29 @@ if os.path.exists(allowlist_path):
 # Save the updated rules.toml to the source directory
 modified_rules_path = os.path.join(source_dir, 'rules.toml')
 with open(modified_rules_path, 'w') as modified_rules_file:
-    toml
+    toml.dump(rules_data, modified_rules_file)
+
+# Print the contents of the modified rules.toml file
+print("Modified rules.toml content:")
+print(toml.dumps(rules_data))
+
+# Ensure the rules file path is absolute
+modified_rules_path = os.path.abspath(modified_rules_path)
+
+# Run Gitleaks in no-git mode on the specified directory using the modified rules
+gitleaks_output = os.path.join(gitleaks_report_dir, f"{repo_name}_gitleaks.json")
+result = subprocess.run([
+    gitleaks_binary, 'detect', '--no-git', '--source', source_dir,
+    '--config-path', modified_rules_path,
+    '--report-format', 'json', '--report-path', gitleaks_output
+], capture_output=True, text=True)
+
+# Check if there were any errors
+if result.returncode != 0:
+    print("Gitleaks encountered an error:")
+    print(result.stderr)
+else:
+    # If needed, read the report to verify its contents
+    report_df = pd.read_json(gitleaks_output)
+    print(report_df.head())  # Print the first few rows for verification
+    print(f"Gitleaks no-git scan for {repo_name} completed. Report saved to {gitleaks_output}")
