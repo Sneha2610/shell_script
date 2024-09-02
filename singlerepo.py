@@ -1,7 +1,6 @@
 import os
 import subprocess
 import toml
-import shutil
 import pandas as pd
 
 # Define the specific project and repository you want to test
@@ -20,15 +19,8 @@ gitleaks_binary = './tools/gitleaks'  # Adjust this path
 if not os.path.exists(gitleaks_report_dir):
     os.makedirs(gitleaks_report_dir)
 
-# Personal Access Token for authentication
-pat = os.environ['AZURE_DEVOPS_PAT']
-
-# Construct the repository URL with PAT
-repo_url = f"https://{pat}@dev.azure.com/your_organization/{project_name}/_git/{repo_name}"
-clone_dir = os.path.join(gitleaks_report_dir, repo_name)
-
-# Clone the repository
-subprocess.run(['git', 'clone', repo_url, clone_dir])
+# Assuming the source directory for scanning is already checked out or available locally
+source_dir = f'/path/to/your/local/clone/of/{repo_name}'
 
 # Locate the allowlist file in the checked-out allowlist repository
 allowlist_path = os.path.join(allowlist_repo_dir, project_name, repo_name, 'allowlist.toml')
@@ -44,21 +36,7 @@ if os.path.exists(allowlist_path):
         # Assuming the allowlist is structured in a way that it can be directly merged
         rules_data['rules'].extend(allowlist_data.get('rules', []))
 
-# Save the updated rules.toml to the cloned repository's directory
-modified_rules_path = os.path.join(clone_dir, 'rules.toml')
+# Save the updated rules.toml to the source directory
+modified_rules_path = os.path.join(source_dir, 'rules.toml')
 with open(modified_rules_path, 'w') as modified_rules_file:
-    toml.dump(rules_data, modified_rules_file)
-
-# Run Gitleaks on the cloned repository using the modified rules
-gitleaks_output = os.path.join(gitleaks_report_dir, f"{repo_name}_gitleaks.json")
-subprocess.run([
-    gitleaks_binary, 'detect', '--source', clone_dir,
-    '--config-path', modified_rules_path,
-    '--report-format', 'json', '--report-path', gitleaks_output
-])
-
-# If needed, read the report to verify its contents
-report_df = pd.read_json(gitleaks_output)
-print(report_df.head())  # Print the first few rows for verification
-
-print(f"Gitleaks scan for {repo_name} completed. Report saved to {gitleaks_output}")
+    toml
