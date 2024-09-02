@@ -1,0 +1,40 @@
+trigger:
+  - main  # Adjust this to your branch name
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'  # Ensure Python 3 is available
+
+  - checkout: self
+    clean: true
+
+  - script: |
+      python3 <<EOF
+import csv
+
+# Path to the CSV file
+csv_file_path = 'repos_list.csv'
+
+# Read the CSV file
+with open(csv_file_path, newline='') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        print(f"##vso[task.setvariable variable=projectName]{row['projectName']}")
+        print(f"##vso[task.setvariable variable=repoName]{row['repoName']}")
+EOF
+    displayName: 'Read CSV and Set Variables'
+
+  - template: gitleaks-template.yml
+    parameters:
+      projectName: $(projectName)
+      repoName: $(repoName)
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: 'combined_gitleaks_report.csv'
+      artifact: 'GitleaksCombinedReport'
+    displayName: 'Publish Combined Gitleaks Report'
