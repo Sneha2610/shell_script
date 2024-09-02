@@ -2,11 +2,14 @@
 
 # Paths to directories and files
 ALLOWLIST_REPO_DIR="path/to/checked_out_allowlist_repo"
-GITLEAKS_BINARY="./tools/gitleaks"
+GITLEAKS_BINARY="./path/to/gitleaks"  # Update this to the actual path of your Gitleaks binary in the repo
 RULES_TEMPLATE="path/to/default/rules.toml"
 GITLEAKS_REPORT_DIR="gitleaks_reports"
 CSV_FILE="repos_list.csv"
 COMBINED_CSV_REPORT="combined_gitleaks_report.csv"
+
+# Make sure the Gitleaks binary is executable
+chmod +x "$GITLEAKS_BINARY"
 
 # Create a directory to store the Gitleaks reports if it doesn't exist
 mkdir -p "$GITLEAKS_REPORT_DIR"
