@@ -1,12 +1,15 @@
 import os
 import csv
 import subprocess
+import toml
 import pandas as pd
 
 # Define paths and filenames
 input_csv = 'projects_and_repositories.csv'
 output_csv = 'gitleaks_report.csv'
 gitleaks_report_dir = 'gitleaks_reports'
+rules_template = 'path/to/default/rules.toml'  # Template rules file
+allowlist_repo_dir = '/path/to/checked_out_allowlist_repo'  # Path to the already checked out allowlist repo
 
 # Paths to your Gitleaks binary and config file
 gitleaks_binary = './tools/gitleaks'  # Adjust this path
@@ -33,11 +36,30 @@ with open(input_csv, 'r') as csvfile:
         # Clone the repository
         subprocess.run(['git', 'clone', repo_url, clone_dir])
 
-        # Run Gitleaks on the cloned repository using your binary and config
+        # Locate the allowlist file in the checked-out allowlist repository
+        allowlist_path = os.path.join(allowlist_repo_dir, project_name, repo_name, 'allowlist.toml')
+
+        # Load the default rules template
+        with open(rules_template, 'r') as file:
+            rules_data = toml.load(file)
+
+        # Modify the rules with the allowlist if the file exists
+        if os.path.exists(allowlist_path):
+            with open(allowlist_path, 'r') as allowlist_file:
+                allowlist_data = toml.load(allowlist_file)
+                # Merge allowlist data into the rules data
+                rules_data.update(allowlist_data)
+        
+        # Save the updated rules.toml to the cloned repository's directory
+        modified_rules_path = os.path.join(clone_dir, 'rules.toml')
+        with open(modified_rules_path, 'w') as modified_rules_file:
+            toml.dump(rules_data, modified_rules_file)
+
+        # Run Gitleaks in no-git mode on the cloned repository using the modified rules
         gitleaks_output = os.path.join(gitleaks_report_dir, f"{repo_name}_gitleaks.json")
         subprocess.run([
-            gitleaks_binary, 'detect', '--source', clone_dir,
-            '--config-path', gitleaks_config,
+            gitleaks_binary, 'detect', '--no-git', '--source', clone_dir,
+            '--config-path', modified_rules_path,
             '--report-format', 'json', '--report-path', gitleaks_output
         ])
 
@@ -54,4 +76,4 @@ final_report = pd.concat(reports, ignore_index=True)
 # Write the final report to CSV
 final_report.to_csv(output_csv, index=False)
 
-print(f"Gitleaks scan completed. Consolidated report saved to {output_csv}")
+print(f"Gitleaks scan completed in no-git mode. Consolidated report saved to {output_csv}")
