@@ -46,11 +46,11 @@ with open(input_csv, 'r') as csvfile:
     for row in csvreader:
         repo_name = row['repo_name']  # Correctly reference the 'repo_name' field in each row
         
+        # Reset the rule file to its original state before each iteration (inside the loop)
+        reset_rule_file(originalRuleFilePath, ruleFilePath)
+        
         # Define paths specific to each repository
         whitelistFilePath = f'gitleaks-config/secops/Gitleaks/{repo_name}/gitleaks.toml'
-        
-        # Reset the rule file to its original state before each iteration
-        reset_rule_file(originalRuleFilePath, ruleFilePath)
         
         # Check if the whitelist file exists for the current repository
         if os.path.exists(whitelistFilePath):
