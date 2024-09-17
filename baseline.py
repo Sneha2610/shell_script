@@ -35,7 +35,7 @@ HTML_TEMPLATE = """
             </tr>
         </thead>
         <tbody>
-            {rows}
+            {{ rows }}
         </tbody>
     </table>
 </body>
@@ -72,7 +72,7 @@ def generate_html_report(json_report_path, output_html_path):
         secret = finding.get('Match', 'N/A')   # Get the matched secret
         rows += ROW_TEMPLATE.format(commit=commit, file=file, secret=secret)
 
-    html_content = HTML_TEMPLATE.format(rows=rows)
+    html_content = HTML_TEMPLATE.replace('{{ rows }}', rows)
 
     # Write the HTML content to the output file
     with open(output_html_path, 'w') as f:
