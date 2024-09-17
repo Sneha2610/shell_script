@@ -30,7 +30,7 @@ HTML_TEMPLATE = """
             <tr>
                 <th>Commit</th>
                 <th>File</th>
-                <th>Secret</th>
+                <th>Match</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -58,18 +58,18 @@ def generate_html_report(json_report_path, output_html_path):
     with open(json_report_path, 'r') as f:
         report_data = json.load(f)
 
-    # Check if 'leaks' key exists in the report and it’s a list
-    if 'leaks' in report_data and isinstance(report_data['leaks'], list):
-        leaks = report_data['leaks']
+    # Assuming 'Match' is part of each finding in the JSON structure
+    if isinstance(report_data, list):
+        findings = report_data
     else:
-        print("The Gitleaks report does not contain any leaks.")
+        print("The Gitleaks report does not contain any findings.")
         return
 
     rows = ""
-    for leak in leaks:
-        commit = leak.get('commit', 'N/A')  # Use 'N/A' if key not found
-        file = leak.get('file', 'N/A')
-        secret = leak.get('secret', 'N/A')
+    for finding in findings:
+        commit = finding.get('Commit', 'N/A')  # Get the commit ID
+        file = finding.get('File', 'N/A')      # Get the file path
+        secret = finding.get('Match', 'N/A')   # Get the matched secret
         rows += ROW_TEMPLATE.format(commit=commit, file=file, secret=secret)
 
     html_content = HTML_TEMPLATE.format(rows=rows)
