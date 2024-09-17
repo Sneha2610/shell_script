@@ -54,6 +54,11 @@ ROW_TEMPLATE = """
 """
 
 def generate_html_report(json_report_path, output_html_path):
+    # Ensure the output directory exists
+    output_dir = os.path.dirname(output_html_path)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     # Load the Gitleaks report
     with open(json_report_path, 'r') as f:
         report_data = json.load(f)
@@ -97,12 +102,12 @@ def clear_old_reports():
     os.makedirs(report_dir)
 
 if __name__ == "__main__":
+    # Clear old reports (optional)
+    clear_old_reports()
+
     # Generate HTML report from Gitleaks JSON
     generate_html_report('gitleaks_report.json', 'reports/gitleaks_report.html')
 
     # Optionally update baseline with flagged false positives (assumed to be gathered interactively)
     flagged_false_positives = []  # You can update this part with actual false positives later
     update_baseline('baseline.json', flagged_false_positives)
-
-    # Clear old reports (optional)
-    clear_old_reports()
