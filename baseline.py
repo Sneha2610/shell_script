@@ -54,18 +54,27 @@ ROW_TEMPLATE = """
 """
 
 def generate_html_report(json_report_path, output_html_path):
+    # Load the Gitleaks report
     with open(json_report_path, 'r') as f:
         report_data = json.load(f)
 
+    # Check if 'leaks' key exists in the report and it’s a list
+    if 'leaks' in report_data and isinstance(report_data['leaks'], list):
+        leaks = report_data['leaks']
+    else:
+        print("The Gitleaks report does not contain any leaks.")
+        return
+
     rows = ""
-    for leak in report_data['leaks']:
-        commit = leak['commit']
-        file = leak['file']
-        secret = leak['secret']
+    for leak in leaks:
+        commit = leak.get('commit', 'N/A')  # Use 'N/A' if key not found
+        file = leak.get('file', 'N/A')
+        secret = leak.get('secret', 'N/A')
         rows += ROW_TEMPLATE.format(commit=commit, file=file, secret=secret)
 
     html_content = HTML_TEMPLATE.format(rows=rows)
 
+    # Write the HTML content to the output file
     with open(output_html_path, 'w') as f:
         f.write(html_content)
 
@@ -88,10 +97,12 @@ def clear_old_reports():
     os.makedirs(report_dir)
 
 if __name__ == "__main__":
+    # Generate HTML report from Gitleaks JSON
     generate_html_report('gitleaks_report.json', 'reports/gitleaks_report.html')
-    # Assume flagged false positives will be collected from the user interaction
-    flagged_false_positives = [
-        # Add false positives here for now, can come from a POST request later
-    ]
+
+    # Optionally update baseline with flagged false positives (assumed to be gathered interactively)
+    flagged_false_positives = []  # You can update this part with actual false positives later
     update_baseline('baseline.json', flagged_false_positives)
+
+    # Clear old reports (optional)
     clear_old_reports()
