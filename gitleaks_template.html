@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gitleaks Report</title>
+    <style>
+        /* Add your CSS styles here */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gitleaks Scan Report</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>File</th>
+                <th>Line</th>
+                <th>Secret</th>
+                <th>Rule</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for finding in findings %}
+            <tr>
+                <td>{{ finding.Description }}</td>
+                <td>{{ finding.File }}</td>
+                <td>{{ finding.StartLine }} - {{ finding.EndLine }}</td>
+                <td>{{ finding.Secret }}</td>
+                <td>{{ finding.RuleID }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
