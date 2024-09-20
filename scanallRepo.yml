@@ -1,0 +1,52 @@
+trigger:
+  branches:
+    include:
+      - '*'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  repoListFile: '$(System.DefaultWorkingDirectory)/repo_list.csv'  # Path to your CSV file
+  repoMatrix: {}
+
+steps:
+# Step to download CSV file (if stored as an artifact in a previous step)
+- download: current
+  artifact: 'repo-list-artifact' # If you have uploaded repo list CSV as an artifact in a prior build
+  displayName: 'Download repo list'
+
+# Step to read the CSV and create a matrix of repositories
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    script: |
+      declare -A repoMatrix
+      repoList='{}'
+      while IFS=, read -r project_name repo_name; do
+        if [ "$project_name" != "Project Name" ]; then  # Skip the header line
+          repoMatrix["$repo_name"]=$project_name
+        fi
+      done < $(repoListFile)
+
+      # Output repo matrix as a JSON object
+      echo 'Repo Matrix:'
+      for repo in "${!repoMatrix[@]}"; do
+        project="${repoMatrix[$repo]}"
+        echo "  {\"repo\": \"$repo\", \"project\": \"$project\"},"
+      done
+  displayName: 'Generate Repo Matrix'
+  continueOnError: false
+
+# Job for each repository using matrix
+- job: GitleaksScan
+  displayName: 'Run Gitleaks for each repository'
+  strategy:
+    matrix:
+      ${{ variables.repoMatrix }}  # Dynamically add matrix from repoMatrix
+  steps:
+    - template: gitleaksscan.yml@templates  # Template file path
+      parameters:
+        repoName: ${{ matrix.repo }}
+        projectName: ${{ matrix.project }}
+
