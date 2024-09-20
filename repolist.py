@@ -1,22 +1,35 @@
 import requests
 import csv
+import base64
+import os
 
 # Replace these variables with your values
 ado_org = "your_ado_organization"  # e.g., 'myorg'
 project_name = "security"  # The project you're interested in
-pat = "your_personal_access_token"  # Your Azure DevOps PAT
+pat = os.getenv("ADO_PAT")  # Fetching the token from environment variable ADO_PAT
+
+if not pat:
+    print("Personal Access Token (PAT) not found in environment variables. Please set ADO_PAT.")
+    exit()
 
 # Azure DevOps API URL for fetching repositories
-url = f"https://dev.azure.com/{ado_org}/{project_name}/_apis/git/repositories?api-version=6.0"
+url = f"https://dev.azure.com/{ado_org}/{project_name}/_apis/git/repositories?api-version=7.0"
 
 # Create the authentication headers
+pat_bytes = f":{pat}".encode('ascii')
+pat_base64 = base64.b64encode(pat_bytes).decode('ascii')
 headers = {
     'Content-Type': 'application/json',
-    'Authorization': f'Basic {requests.auth._basic_auth_str("", pat)}'
+    'Authorization': f'Basic {pat_base64}'
 }
 
 # Send the request to get repository information
 response = requests.get(url, headers=headers)
+
+# Debugging: Print the raw response
+print(f"Status Code: {response.status_code}")
+print(f"Response Content: {response.text}")
+
 if response.status_code == 200:
     repos = response.json()['value']
 else:
