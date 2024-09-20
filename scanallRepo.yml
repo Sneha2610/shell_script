@@ -1,50 +1,25 @@
 trigger:
-  branches:
-    include:
-      - '*'
+- main
 
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+  GITLEAKS_TEMPLATE: 'path/to/your/gitleaks_template.yaml'  # Path to your Gitleaks scan template
+
 jobs:
-- job: ParseRepoList
-  steps:
-  - checkout: self
-
-  # Parse the CSV and create a variable group of repositories
-  - task: Bash@3
-    name: ParseRepoList
-    inputs:
-      targetType: 'inline'
-      script: |
-        echo "repositories:"
-        tail -n +2 repo_list.csv | while IFS=, read -r project_name repo_name; do
-          echo "- projectName: '$project_name'"
-          echo "  repoName: '$repo_name'"
-        done > repo_list.yaml
-
-  # Publish the repo list as an artifact
-  - publish: repo_list.yaml
-    artifact: repoList
-
 - job: GitleaksScan
-  dependsOn: ParseRepoList
+  displayName: 'Run Gitleaks Scan for Repositories'
+  pool:
+    vmImage: 'ubuntu-latest'
   steps:
-  - download: current
-    artifact: repoList
-
-  # Load the repositories from the parsed YAML
-  - task: Bash@3
-    name: LoadRepoList
+  - task: ReadCsv@1
     inputs:
-      targetType: 'inline'
-      script: |
-        REPOS=$(yq eval '.repositories' repo_list.yaml)
-        echo "##vso[task.setVariable variable=repos]$REPOS"
+      sourcePath: '$(Build.SourcesDirectory)/project_and_repositories.csv'
+      outputVariable: 'repositories'
 
-  # Use a loop to iterate over repositories
-  - ${{ each repo in fromYaml(variables['repos']) }}:
-    - template: azure-pipelines-run-gitleaks.yml@templates
+  - ${{ each repo in variables['repositories'] }}:
+    - template: ${{ variables.GITLEAKS_TEMPLATE }}
       parameters:
-        projectName: ${{ repo.projectName }}
-        repoName: ${{ repo.repoName }}
+        projectName: ${{ split(repo, ',')[0] }}
+        repoName: ${{ split(repo, ',')[1] }}
