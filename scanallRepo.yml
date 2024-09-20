@@ -13,13 +13,21 @@ jobs:
   pool:
     vmImage: 'ubuntu-latest'
   steps:
-  - task: ReadCsv@1
-    inputs:
-      sourcePath: '$(Build.SourcesDirectory)/project_and_repositories.csv'
-      outputVariable: 'repositories'
+  - powershell: |
+      # Read the CSV file and iterate over each line
+      $csvPath = "$(Build.SourcesDirectory)\project_and_repositories.csv"
+      $csvContent = Import-Csv -Path $csvPath
 
-  - ${{ each repo in variables['repositories'] }}:
-    - template: ${{ variables.GITLEAKS_TEMPLATE }}
-      parameters:
-        projectName: ${{ split(repo, ',')[0] }}
-        repoName: ${{ split(repo, ',')[1] }}
+      foreach ($row in $csvContent) {
+        $projectName = $row.'Project Name'
+        $repoName = $row.'Repository Name'
+
+        if ($projectName -ne "Project Name") {  # Skip header
+          Write-Host "Scanning project: $projectName, repository: $repoName"
+          
+          # Here, you can call the Gitleaks template directly
+          # Assuming you have the Gitleaks template logic included in this pipeline
+          .\path\to\gitleaks_template.ps1 -projectName $projectName -repoName $repoName
+        }
+      }
+    displayName: 'Read CSV and Run Gitleaks Scan'
