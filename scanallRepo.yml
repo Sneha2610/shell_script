@@ -6,47 +6,28 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  repoListFile: '$(System.DefaultWorkingDirectory)/repo_list.csv'  # Path to your CSV file
-  repoMatrix: {}
-
 steps:
-# Step to download CSV file (if stored as an artifact in a previous step)
-- download: current
-  artifact: 'repo-list-artifact' # If you have uploaded repo list CSV as an artifact in a prior build
-  displayName: 'Download repo list'
+# Step to download repo and CSV file
+- checkout: self
 
-# Step to read the CSV and create a matrix of repositories
+# Step to iterate through the CSV and run the Gitleaks template for each repo
 - task: Bash@3
   inputs:
     targetType: 'inline'
     script: |
-      declare -A repoMatrix
-      repoList='{}'
-      while IFS=, read -r project_name repo_name; do
-        if [ "$project_name" != "Project Name" ]; then  # Skip the header line
-          repoMatrix["$repo_name"]=$project_name
-        fi
-      done < $(repoListFile)
+      # Read the CSV file and loop through each line (ignoring the header)
+      tail -n +2 repo_list.csv | while IFS=, read -r project_name repo_name; do
+        echo "Processing project: $project_name, repo: $repo_name"
+        
+        # Invoke the template for each repository by exporting the variables
+        echo "##vso[task.setvariable variable=repoName]$repo_name"
+        echo "##vso[task.setvariable variable=projectName]$project_name"
+        
+        # Call a template for each repo
+        echo "Calling Gitleaks template for repo: $repo_name"
+        echo "##vso[task.complete result=Succeeded;]"
 
-      # Output repo matrix as a JSON object
-      echo 'Repo Matrix:'
-      for repo in "${!repoMatrix[@]}"; do
-        project="${repoMatrix[$repo]}"
-        echo "  {\"repo\": \"$repo\", \"project\": \"$project\"},"
+        # Run the template with the variables set
+        azure-pipelines-run-gitleaks.yml
       done
-  displayName: 'Generate Repo Matrix'
-  continueOnError: false
-
-# Job for each repository using matrix
-- job: GitleaksScan
-  displayName: 'Run Gitleaks for each repository'
-  strategy:
-    matrix:
-      ${{ variables.repoMatrix }}  # Dynamically add matrix from repoMatrix
-  steps:
-    - template: gitleaksscan.yml@templates  # Template file path
-      parameters:
-        repoName: ${{ matrix.repo }}
-        projectName: ${{ matrix.project }}
-
+  displayName: 'Iterate CSV and Run Gitleaks Scan for Each Repo'
