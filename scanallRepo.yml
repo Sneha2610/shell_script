@@ -6,33 +6,44 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-steps:
-# Step to download repo and CSV file
-- checkout: self
+jobs:
+- job: ParseRepoList
+  steps:
+  - checkout: self
 
-# Step to iterate through the CSV and invoke the Gitleaks template for each repo
-- task: Bash@3
-  name: GenerateRepoList
-  inputs:
-    targetType: 'inline'
-    script: |
-      # Extract the repo list from the CSV and format as YAML for matrix
-      echo "repositories:"
-      tail -n +2 repo_list.csv | while IFS=, read -r project_name repo_name; do
-        echo "- projectName: '$project_name'"
-        echo "  repoName: '$repo_name'"
-      done > repo_list.yaml
+  # Parse the CSV and create a variable group of repositories
+  - task: Bash@3
+    name: ParseRepoList
+    inputs:
+      targetType: 'inline'
+      script: |
+        echo "repositories:"
+        tail -n +2 repo_list.csv | while IFS=, read -r project_name repo_name; do
+          echo "- projectName: '$project_name'"
+          echo "  repoName: '$repo_name'"
+        done > repo_list.yaml
 
-# Include the YAML file with repo list to create the matrix
-- task: Bash@3
-  name: ReadYAML
-  inputs:
-    targetType: 'inline'
-    script: |
-      echo "Reading generated YAML repo list"
-      cat repo_list.yaml
+  - publish: repo_list.yaml
+    artifact: repoList
 
-# Use the matrix strategy to run Gitleaks for each repo
-- template: azure-pipelines-run-gitleaks.yml@templates
-  parameters:
-    repoListFile: repo_list.yaml
+- job: GitleaksScan
+  dependsOn: ParseRepoList
+  steps:
+  - download: current
+    artifact: repoList
+
+  # Load the repositories from the parsed YAML
+  - task: Bash@3
+    name: LoadRepoList
+    inputs:
+      targetType: 'inline'
+      script: |
+        REPOS=$(cat repo_list.yaml | yq '.repositories')
+        echo "##vso[task.setVariable variable=repos]$REPOS"
+      
+  # For loop to iterate over the repositories
+  - ${{ each repo in fromYaml(variables['repos']) }}:
+    - template: azure-pipelines-run-gitleaks.yml@templates
+      parameters:
+        projectName: ${{ repo.projectName }}
+        repoName: ${{ repo.repoName }}
