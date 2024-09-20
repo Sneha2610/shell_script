@@ -10,24 +10,29 @@ steps:
 # Step to download repo and CSV file
 - checkout: self
 
-# Step to iterate through the CSV and run the Gitleaks template for each repo
+# Step to iterate through the CSV and invoke the Gitleaks template for each repo
 - task: Bash@3
+  name: GenerateRepoList
   inputs:
     targetType: 'inline'
     script: |
-      # Read the CSV file and loop through each line (ignoring the header)
+      # Extract the repo list from the CSV and format as YAML for matrix
+      echo "repositories:"
       tail -n +2 repo_list.csv | while IFS=, read -r project_name repo_name; do
-        echo "Processing project: $project_name, repo: $repo_name"
-        
-        # Invoke the template for each repository by exporting the variables
-        echo "##vso[task.setvariable variable=repoName]$repo_name"
-        echo "##vso[task.setvariable variable=projectName]$project_name"
-        
-        # Call a template for each repo
-        echo "Calling Gitleaks template for repo: $repo_name"
-        echo "##vso[task.complete result=Succeeded;]"
+        echo "- projectName: '$project_name'"
+        echo "  repoName: '$repo_name'"
+      done > repo_list.yaml
 
-        # Run the template with the variables set
-        azure-pipelines-run-gitleaks.yml
-      done
-  displayName: 'Iterate CSV and Run Gitleaks Scan for Each Repo'
+# Include the YAML file with repo list to create the matrix
+- task: Bash@3
+  name: ReadYAML
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "Reading generated YAML repo list"
+      cat repo_list.yaml
+
+# Use the matrix strategy to run Gitleaks for each repo
+- template: azure-pipelines-run-gitleaks.yml@templates
+  parameters:
+    repoListFile: repo_list.yaml
