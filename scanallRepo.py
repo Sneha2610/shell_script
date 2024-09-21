@@ -1,50 +1,61 @@
-# Define the base paths for Gitleaks and Whitelist repos
-REPO_BASE_PATH="./repositories"
-WHITELIST_BASE_PATH="./whitelist"
-REPORTS_PATH="./reports"
+import csv
+import os
+import subprocess
+import shutil
 
-# Create a reports directory if it doesn't exist
-mkdir -p "$REPORTS_PATH"
+# Define paths
+repo_base_path = "./repositories"
+whitelist_base_path = "./whitelist"
+reports_path = "./reports"
 
-# Read the CSV file and iterate over each repository
-while IFS=',' read -r projectName repoName; do
-  if [[ "$projectName" != "Project Name" ]]; then
-    echo "Processing project: $projectName, repository: $repoName"
+# Create reports directory if it doesn't exist
+os.makedirs(reports_path, exist_ok=True)
 
-    # Clone the repository
-    repoPath="$REPO_BASE_PATH/$repoName"
-    if [ ! -d "$repoPath" ]; then
-      git clone "https://your-git-server/$projectName/$repoName.git" "$repoPath"
-    else
-      echo "Repository $repoName already cloned."
-    fi
+# Function to run a command and capture output
+def run_command(command):
+    result = subprocess.run(command, shell=True, text=True, capture_output=True)
+    if result.returncode != 0:
+        print(f"Error running command: {command}")
+        print(result.stderr)
+    return result
 
-    # Check if a whitelist (allowlist) file exists for the repository
-    whitelistFile="$WHITELIST_BASE_PATH/$projectName/$repoName/gitleaks.toml"
-    rulesFile="$repoPath/gitleaks-rules.toml"
-    
-    if [ -f "$whitelistFile" ]; then
-      echo "Whitelist file found for $repoName."
-      
-      # Merge the whitelist with the Gitleaks rules inline
-      echo "Merging whitelist with rules.toml"
-      cat "$whitelistFile" >> "$rulesFile"
-      
-      # Run Gitleaks scan with the merged rules
-      echo "Running Gitleaks scan with updated rules for $repoName"
-      cd "$repoPath"
-      ./gitleaks --config "$rulesFile" --path . --report-format csv --report-path "$REPORTS_PATH/${repoName}-gitleaks-report.csv"
-      
-    else
-      echo "No whitelist file found for $repoName. Using default rules."
-      
-      # Run Gitleaks scan with default rules
-      cd "$repoPath"
-      ./gitleaks --config "$rulesFile" --path . --report-format csv --report-path "$REPORTS_PATH/${repoName}-gitleaks-report.csv"
-    fi
-    
-    # Go back to the base directory after the scan
-    cd - 
-    echo "Completed Gitleaks scan for $repoName. Report saved to $REPORTS_PATH/${repoName}-gitleaks-report.csv"
-  fi
-done < $(Build.SourcesDirectory)/project_and_repositories.csv
+# Read the CSV file and iterate over each project and repository
+csv_file_path = os.path.join(os.getenv("Build_SourcesDirectory"), "project_and_repositories.csv")
+with open(csv_file_path, mode='r') as file:
+    csv_reader = csv.reader(file)
+    next(csv_reader)  # Skip header
+
+    for row in csv_reader:
+        project_name, repo_name = row
+        print(f"Processing project: {project_name}, repository: {repo_name}")
+
+        # Clone the repository
+        repo_path = os.path.join(repo_base_path, repo_name)
+        if not os.path.isdir(repo_path):
+            clone_command = f"git clone https://your-git-server/{project_name}/{repo_name}.git {repo_path}"
+            run_command(clone_command)
+        else:
+            print(f"Repository {repo_name} already cloned.")
+
+        # Check if a whitelist file exists for the repository
+        whitelist_file = os.path.join(whitelist_base_path, project_name, repo_name, "gitleaks.toml")
+        rules_file = os.path.join(repo_path, "gitleaks-rules.toml")
+        
+        if os.path.isfile(whitelist_file):
+            print(f"Whitelist file found for {repo_name}. Merging with rules.toml.")
+            
+            # Append whitelist to rules file
+            with open(rules_file, 'a') as rules, open(whitelist_file, 'r') as whitelist:
+                rules.write(whitelist.read())
+
+        else:
+            print(f"No whitelist file found for {repo_name}. Using default rules.")
+
+        # Run Gitleaks scan with the appropriate rules file and save report as CSV
+        report_file = os.path.join(reports_path, f"{repo_name}-gitleaks-report.csv")
+        gitleaks_command = f"./gitleaks --config {rules_file} --path {repo_path} --report-format csv --report-path {report_file}"
+        run_command(gitleaks_command)
+
+        print(f"Completed Gitleaks scan for {repo_name}. Report saved to {report_file}")
+
+print("All scans completed.")
