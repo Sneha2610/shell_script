@@ -1,12 +1,13 @@
 import csv
 import os
 import subprocess
-import shutil
 
 # Define paths
-repo_base_path = "./repositories"
-whitelist_base_path = "./whitelist"
-reports_path = "./reports"
+repo_base_path = "./repositories"  # Directory where repositories will be cloned
+whitelist_base_path = "./whitelist"  # Directory where whitelist files are stored
+reports_path = "./reports"  # Directory to save reports
+gitleaks_binary = "/path/to/gitleaks"  # Path to your Gitleaks binary
+default_rules_file = "/path/to/default/gitleaks-rules.toml"  # Path to your default Gitleaks rules file
 
 # Create reports directory if it doesn't exist
 os.makedirs(reports_path, exist_ok=True)
@@ -44,16 +45,18 @@ with open(csv_file_path, mode='r') as file:
         if os.path.isfile(whitelist_file):
             print(f"Whitelist file found for {repo_name}. Merging with rules.toml.")
             
-            # Append whitelist to rules file
+            # Copy default rules to the repository directory and append whitelist
+            shutil.copy(default_rules_file, rules_file)
             with open(rules_file, 'a') as rules, open(whitelist_file, 'r') as whitelist:
                 rules.write(whitelist.read())
-
         else:
             print(f"No whitelist file found for {repo_name}. Using default rules.")
+            # Use default rules if no whitelist exists
+            shutil.copy(default_rules_file, rules_file)
 
         # Run Gitleaks scan with the appropriate rules file and save report as CSV
         report_file = os.path.join(reports_path, f"{repo_name}-gitleaks-report.csv")
-        gitleaks_command = f"./gitleaks --config {rules_file} --path {repo_path} --report-format csv --report-path {report_file}"
+        gitleaks_command = f"{gitleaks_binary} --config {rules_file} --path {repo_path} --report-format csv --report-path {report_file}"
         run_command(gitleaks_command)
 
         print(f"Completed Gitleaks scan for {repo_name}. Report saved to {report_file}")
