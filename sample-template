@@ -1,0 +1,13 @@
+# my-template.yaml
+parameters:
+  projectName: ''
+  repoName: ''
+
+steps:
+- script: |
+    echo "Processing repository:"
+    echo "Project: ${{ parameters.projectName }}"
+    echo "Repository: ${{ parameters.repoName }}"
+
+    # You can add your specific pipeline tasks here
+    # Example: Git clone, Gitleaks scan, etc.
