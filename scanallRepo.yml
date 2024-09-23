@@ -6,32 +6,32 @@ pool:
 
 steps:
 
-# Step 1: Use PowerShell to read the CSV and loop through each row
-- task: PowerShell@2
+# Step 1: Use Bash to read the CSV and loop through each row
+- task: Bash@3
+  displayName: 'Read CSV and set variables'
   inputs:
     targetType: 'inline'
     script: |
-      # Import the CSV from the source directory
-      $csv = Import-Csv "$(Build.SourcesDirectory)/repos.csv"
+      # Define the CSV file path
+      csv_file="$(Build.SourcesDirectory)/repos.csv"
 
-      # Loop through each row in CSV
-      foreach ($row in $csv) {
-          # Set the ProjectName and RepoName variables for each row
-          Write-Host "##vso[task.setvariable variable=ProjectName]$($row.ProjectName)"
-          Write-Host "##vso[task.setvariable variable=RepoName]$($row.RepoName)"
-          
-          # Trigger a pipeline task for each repository by invoking a new script or template
-          Invoke-Expression '##vso[task.logissue type=info]Processing $($row.ProjectName) - $($row.RepoName)'
-          
-          # Invoke the next pipeline task to process the repository
-          # You could trigger a command to invoke the YAML template or other build steps here.
-          Write-Host "Calling template for ProjectName: $($row.ProjectName), RepoName: $($row.RepoName)"
-          
-          # Call the next template step or script by using the pipeline mechanism
-          Start-Sleep -Seconds 1
-      }
+      # Read the CSV file, skipping the header (ProjectName,RepoName)
+      tail -n +2 "$csv_file" | while IFS=',' read -r project repo; do
+        echo "Processing Project: $project, Repo: $repo"
 
-# Step 2: Call the template with the current values set in the loop
+        # Set pipeline variables for the current row
+        echo "##vso[task.setvariable variable=ProjectName]$project"
+        echo "##vso[task.setvariable variable=RepoName]$repo"
+
+        # Call the next template with these variables
+        echo "Calling template for ProjectName: $project, RepoName: $repo"
+
+        # Call the next template or step
+        echo "##vso[task.setvariable variable=RepoProcessed]true"
+
+      done
+
+# Step 2: Dynamically invoke the template for each row in the CSV
 - template: my-template.yaml
   parameters:
     projectName: $(ProjectName)
