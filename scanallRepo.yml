@@ -4,48 +4,34 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-jobs:
-- job: FetchAndScanRepos
-  displayName: 'Fetch Repos from CSV and Run Gitleaks Scan'
-  env:
-    TOKEN: $(renovate)  # Use the PAT token
+steps:
 
-  variables:
-    REPO_BASE_PATH: '$(Build.SourcesDirectory)/cloned_repos'
-    repositories: []  # Empty placeholder for repositories list
+# Step 1: Read CSV and loop through each row
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Import the CSV file located in the source directory
+      $csv = Import-Csv $(Build.SourcesDirectory)/repos.csv
+      
+      # Initialize an empty array for parameters
+      $repoParams = @()
 
-  steps:
+      # Loop through each row and add the parameters to the array
+      foreach ($row in $csv) {
+          $repoParams += @{
+              projectName = $row.ProjectName
+              repoName    = $row.RepoName
+          }
+      }
 
-  # Step 1: Download the CSV file
-  - task: DownloadBuildArtifacts@0
-    inputs:
-      buildType: 'specific'
-      artifactName: 'your-artifact-name'
-      downloadPath: '$(Build.SourcesDirectory)/repo-list'
-    displayName: 'Download Repository List CSV'
+      # Serialize the array as JSON to pass it to the next step
+      $json = $repoParams | ConvertTo-Json -Compress
+      Write-Host "##vso[task.setvariable variable=repoParams]$json"
 
-  # Step 2: Parse the CSV file and populate the repositories variable
-  - script: |
-      echo "Reading repositories from CSV..."
-      IFS=',' # Define comma as field separator
-      repositories="[]"
-      while read projectName repoName; do
-        if [ "$projectName" != "Project Name" ]; then  # Skip header
-          echo "Found repo: $projectName/$repoName"
-          repositories=$(echo $repositories | jq --arg pn "$projectName" --arg rn "$repoName" '. + [{"projectName": $pn, "repoName": $rn}]')
-        fi
-      done < $(Build.SourcesDirectory)/repo-list/project_and_repositories.csv
-
-      echo "##vso[task.setvariable variable=repositories;]$repositories"
-    displayName: 'Parse Repositories from CSV'
-  
-  # Step 3: Iterate over each repository and run Gitleaks scan
-  - ${{ each repo in variables.repositories }}:
-    - template: path/to/gitleaks_scan_template.yaml
-      parameters:
-        projectName: ${{ repo.projectName }}
-        repoName: ${{ repo.repoName }}
-        repoPath: $(REPO_BASE_PATH)/${{ repo.repoName }}
-        configPath: $(Build.SourcesDirectory)/gitleaks-config/gitleaks.toml
-        outputPath: $(Build.SourcesDirectory)/gitleaks-reports/${{ repo.repoName }}
-    displayName: 'Run Gitleaks Scan for ${{ repo.repoName }}'
+# Step 2: Iterate over the array of repo parameters and invoke the template
+- ${{ each repo in fromJson(variables['repoParams']) }}:
+  - template: my-template.yaml
+    parameters:
+      projectName: ${{ repo.projectName }}
+      repoName: ${{ repo.repoName }}
