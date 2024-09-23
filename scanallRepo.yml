@@ -1,38 +1,40 @@
 trigger:
-- main
+- none  # Disable triggers for manual runs
 
 pool:
   vmImage: 'ubuntu-latest'
 
-steps:
+jobs:
+- job: ReadCSV
+  displayName: 'Read CSV and Invoke Template'
+  steps:
+  - task: Bash@3
+    displayName: 'Read CSV and Set Variables'
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Define the CSV file path
+        csv_file="$(Build.SourcesDirectory)/repos.csv"
 
-# Step 1: Use Bash to read the CSV and loop through each row
-- task: Bash@3
-  displayName: 'Read CSV and set variables'
-  inputs:
-    targetType: 'inline'
-    script: |
-      # Define the CSV file path
-      csv_file="$(Build.SourcesDirectory)/repos.csv"
+        # Prepare an array for job names
+        echo "##vso[task.setvariable variable=JobNames;isOutput=true]"
 
-      # Read the CSV file, skipping the header (ProjectName,RepoName)
-      tail -n +2 "$csv_file" | while IFS=',' read -r project repo; do
-        echo "Processing Project: $project, Repo: $repo"
+        # Read the CSV file, skipping the header
+        while IFS=',' read -r projectName repoName; do
+          # Skip the header
+          if [[ $projectName != "ProjectName" ]]; then
+            echo "Adding job for Project: $projectName, Repo: $repoName"
+            echo "##vso[task.setvariable variable=JobNames;isOutput=true]Job_${projectName}_${repoName}"
+          fi
+        done < <(tail -n +2 "$csv_file")
 
-        # Set pipeline variables for the current row
-        echo "##vso[task.setvariable variable=ProjectName]$project"
-        echo "##vso[task.setvariable variable=RepoName]$repo"
-
-        # Call the next template with these variables
-        echo "Calling template for ProjectName: $project, RepoName: $repo"
-
-        # Call the next template or step
-        echo "##vso[task.setvariable variable=RepoProcessed]true"
-
-      done
-
-# Step 2: Dynamically invoke the template for each row in the CSV
-- template: my-template.yaml
-  parameters:
-    projectName: $(ProjectName)
-    repoName: $(RepoName)
+- ${{ each jobName in parameters.JobNames }}:
+  - job: ${{ jobName }}
+    displayName: 'Process Repository - ${{ jobName }}'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - template: my-template.yaml
+      parameters:
+        projectName: ${{ jobName.split('_')[1] }}  # Extract ProjectName
+        repoName: ${{ jobName.split('_')[2] }}     # Extract RepoName
