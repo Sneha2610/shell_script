@@ -1,5 +1,5 @@
 trigger:
-- main  # Adjust as per your branch trigger requirements
+- main
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -7,9 +7,16 @@ pool:
 jobs:
 - job: FetchAndScanRepos
   displayName: 'Fetch Repos from CSV and Run Gitleaks Scan'
+  env:
+    TOKEN: $(renovate)  # Use the PAT token
+
+  variables:
+    REPO_BASE_PATH: '$(Build.SourcesDirectory)/cloned_repos'
+    repositories: []  # Empty placeholder for repositories list
+
   steps:
-  
-  # Step 1: Fetch the CSV file
+
+  # Step 1: Download the CSV file
   - task: DownloadBuildArtifacts@0
     inputs:
       buildType: 'specific'
@@ -17,25 +24,28 @@ jobs:
       downloadPath: '$(Build.SourcesDirectory)/repo-list'
     displayName: 'Download Repository List CSV'
 
-  # Step 2: Clone the repositories listed in CSV
+  # Step 2: Parse the CSV file and populate the repositories variable
   - script: |
-      mkdir -p $(Build.SourcesDirectory)/cloned_repos
+      echo "Reading repositories from CSV..."
       IFS=',' # Define comma as field separator
+      repositories="[]"
       while read projectName repoName; do
         if [ "$projectName" != "Project Name" ]; then  # Skip header
-          echo "Cloning repository: $repoName"
-          git clone https://dev.azure.com/your-org-name/$projectName/_git/$repoName $(Build.SourcesDirectory)/cloned_repos/$repoName
+          echo "Found repo: $projectName/$repoName"
+          repositories=$(echo $repositories | jq --arg pn "$projectName" --arg rn "$repoName" '. + [{"projectName": $pn, "repoName": $rn}]')
         fi
       done < $(Build.SourcesDirectory)/repo-list/project_and_repositories.csv
-    displayName: 'Clone Repositories from CSV'
+
+      echo "##vso[task.setvariable variable=repositories;]$repositories"
+    displayName: 'Parse Repositories from CSV'
   
-  # Step 3: Iterate over each cloned repository and run Gitleaks scan template
-  - ${{ each repo in parameters.repositories }}:  # Assuming you pass `repositories` as a parameter
-    - template: path/to/gitleaks_scan_template.yaml  # Directly use the template path here
+  # Step 3: Iterate over each repository and run Gitleaks scan
+  - ${{ each repo in variables.repositories }}:
+    - template: path/to/gitleaks_scan_template.yaml
       parameters:
-        projectName: $(repo.projectName)
-        repoName: $(repo.repoName)
-        repoPath: $(Build.SourcesDirectory)/cloned_repos/$(repo.repoName)
+        projectName: ${{ repo.projectName }}
+        repoName: ${{ repo.repoName }}
+        repoPath: $(REPO_BASE_PATH)/${{ repo.repoName }}
         configPath: $(Build.SourcesDirectory)/gitleaks-config/gitleaks.toml
-        outputPath: $(Build.SourcesDirectory)/gitleaks-reports/$(repo.repoName)
-    displayName: 'Run Gitleaks Scan on Cloned Repositories'
+        outputPath: $(Build.SourcesDirectory)/gitleaks-reports/${{ repo.repoName }}
+    displayName: 'Run Gitleaks Scan for ${{ repo.repoName }}'
