@@ -6,7 +6,10 @@ pool:
 
 jobs:
 - job: ReadCSV
-  displayName: 'Read CSV and Invoke Template'
+  displayName: 'Read CSV and Set Job Names'
+  variables:
+    JobNames: ''
+
   steps:
   - task: Bash@3
     displayName: 'Read CSV and Set Variables'
@@ -15,10 +18,7 @@ jobs:
       script: |
         # Define the CSV file path
         csv_file="$(Build.SourcesDirectory)/repos.csv"
-
-        # Prepare an array for job names
-        echo "##vso[task.setvariable variable=JobNames;isOutput=true]"
-
+        
         # Read the CSV file, skipping the header
         while IFS=',' read -r projectName repoName; do
           # Skip the header
@@ -28,13 +28,14 @@ jobs:
           fi
         done < <(tail -n +2 "$csv_file")
 
-- ${{ each jobName in parameters.JobNames }}:
-  - job: ${{ jobName }}
-    displayName: 'Process Repository - ${{ jobName }}'
+- ${{ if ne(variables.JobNames, '') }}:
+  ${{ each job in variables.JobNames.split(';') }}:
+  - job: ${{ job }}
+    displayName: 'Process Repository - ${{ job }}'
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - template: my-template.yaml
       parameters:
-        projectName: ${{ jobName.split('_')[1] }}  # Extract ProjectName
-        repoName: ${{ jobName.split('_')[2] }}     # Extract RepoName
+        projectName: ${{ job }}  # Assuming you can derive projectName from the job name
+        repoName: ${{ job }}      # Adjust this based on your requirements
