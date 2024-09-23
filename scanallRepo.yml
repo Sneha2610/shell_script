@@ -1,41 +1,44 @@
-trigger:
-- none  # Disable triggers for manual runs
+trigger: none
 
 pool:
   vmImage: 'ubuntu-latest'
 
 jobs:
 - job: ReadCSV
-  displayName: 'Read CSV and Set Job Names'
+  displayName: 'Read CSV and Generate Job Definitions'
   variables:
-    JobNames: ''
+    JobDefinitions: ''
 
   steps:
   - task: Bash@3
-    displayName: 'Read CSV and Set Variables'
+    displayName: 'Read CSV and Generate Job Definitions'
     inputs:
       targetType: 'inline'
       script: |
         # Define the CSV file path
         csv_file="$(Build.SourcesDirectory)/repos.csv"
-        
+
+        # Prepare job definitions
+        job_defs=""
+
         # Read the CSV file, skipping the header
         while IFS=',' read -r projectName repoName; do
           # Skip the header
           if [[ $projectName != "ProjectName" ]]; then
-            echo "Adding job for Project: $projectName, Repo: $repoName"
-            echo "##vso[task.setvariable variable=JobNames;isOutput=true]Job_${projectName}_${repoName}"
+            job_defs+="
+- job: Process_${projectName}_${repoName}
+  displayName: 'Process Repository - ${projectName} - ${repoName}'
+  steps:
+  - template: my-template.yaml
+    parameters:
+      projectName: '${projectName}'
+      repoName: '${repoName}'
+"
           fi
         done < <(tail -n +2 "$csv_file")
 
-- ${{ if ne(variables.JobNames, '') }}:
-  ${{ each job in variables.JobNames.split(';') }}:
-  - job: ${{ job }}
-    displayName: 'Process Repository - ${{ job }}'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - template: my-template.yaml
-      parameters:
-        projectName: ${{ job }}  # Assuming you can derive projectName from the job name
-        repoName: ${{ job }}      # Adjust this based on your requirements
+        # Set the JobDefinitions variable
+        echo "##vso[task.setvariable variable=JobDefinitions;]$job_defs"
+
+- ${{ if ne(variables.JobDefinitions, '') }}:
+  ${{ variables.JobDefinitions }}
