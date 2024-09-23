@@ -6,32 +6,33 @@ pool:
 
 steps:
 
-# Step 1: Read CSV and loop through each row
+# Step 1: Use PowerShell to read the CSV and loop through each row
 - task: PowerShell@2
   inputs:
     targetType: 'inline'
     script: |
-      # Import the CSV file located in the source directory
-      $csv = Import-Csv $(Build.SourcesDirectory)/repos.csv
-      
-      # Initialize an empty array for parameters
-      $repoParams = @()
+      # Import the CSV from the source directory
+      $csv = Import-Csv "$(Build.SourcesDirectory)/repos.csv"
 
-      # Loop through each row and add the parameters to the array
+      # Loop through each row in CSV
       foreach ($row in $csv) {
-          $repoParams += @{
-              projectName = $row.ProjectName
-              repoName    = $row.RepoName
-          }
+          # Set the ProjectName and RepoName variables for each row
+          Write-Host "##vso[task.setvariable variable=ProjectName]$($row.ProjectName)"
+          Write-Host "##vso[task.setvariable variable=RepoName]$($row.RepoName)"
+          
+          # Trigger a pipeline task for each repository by invoking a new script or template
+          Invoke-Expression '##vso[task.logissue type=info]Processing $($row.ProjectName) - $($row.RepoName)'
+          
+          # Invoke the next pipeline task to process the repository
+          # You could trigger a command to invoke the YAML template or other build steps here.
+          Write-Host "Calling template for ProjectName: $($row.ProjectName), RepoName: $($row.RepoName)"
+          
+          # Call the next template step or script by using the pipeline mechanism
+          Start-Sleep -Seconds 1
       }
 
-      # Serialize the array as JSON to pass it to the next step
-      $json = $repoParams | ConvertTo-Json -Compress
-      Write-Host "##vso[task.setvariable variable=repoParams]$json"
-
-# Step 2: Iterate over the array of repo parameters and invoke the template
-- ${{ each repo in fromJson(variables['repoParams']) }}:
-  - template: my-template.yaml
-    parameters:
-      projectName: ${{ repo.projectName }}
-      repoName: ${{ repo.repoName }}
+# Step 2: Call the template with the current values set in the loop
+- template: my-template.yaml
+  parameters:
+    projectName: $(ProjectName)
+    repoName: $(RepoName)
