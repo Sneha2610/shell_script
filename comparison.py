@@ -49,11 +49,9 @@ def compare_csv_files(folder1, folder2, output_folder):
         # Align data types between the two DataFrames
         df1, df2 = align_data_types(df1, df2)
 
-        # Add a column to indicate the source of the data (for easier comparison)
-        if not df1.empty:
-            df1['Source'] = 'reportV7'
-        if not df2.empty:
-            df2['Source'] = 'reportV8'
+        # Explicitly add 'Source' column, even if DataFrame is empty
+        df1['Source'] = 'reportV7' if not df1.empty else 'reportV7_empty'
+        df2['Source'] = 'reportV8' if not df2.empty else 'reportV8_empty'
 
         # Concatenate the DataFrames for comparison
         comparison_df = pd.concat([df1, df2], ignore_index=True, sort=False)
