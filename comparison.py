@@ -63,9 +63,15 @@ def save_comparison_report(comparison_df, output_file):
     comparison_df.to_csv(output_file, index=False)
 
 # Specify your folder paths here
-folder1 = 'Reportv7'  # Replace with the path to Folder 1
-folder2 = 'Reportv8'  # Replace with the path to Folder 2
+folder1 = 'C:/path/to/Reportv7'  # Replace with the actual path to Folder 1
+folder2 = 'C:/path/to/Reportv8'  # Replace with the actual path to Folder 2
 
 # Compare CSV files and save the report
 comparison_df = compare_csv_files(folder1, folder2)
-save_comparison_report(comparison_df, 'comparison_report.csv')
+
+# Check if comparison_df is empty before saving
+if not comparison_df.empty:
+    save_comparison_report(comparison_df, 'comparison_report.csv')
+    print("Comparison report generated successfully: 'comparison_report.csv'")
+else:
+    print("No common CSV files found for comparison.")
