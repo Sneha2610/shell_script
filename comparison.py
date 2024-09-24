@@ -1,6 +1,12 @@
 import os
-import csv
+import zipfile
 import argparse
+import csv
+
+def unzip_file(zip_path, extract_to):
+    """Unzips a file to a specified directory."""
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_to)
 
 def read_csv(file_path):
     """Reads a CSV file and returns its content as a list of dictionaries."""
@@ -29,22 +35,33 @@ def write_comparison_result(repo_name, added_leaks, removed_leaks, writer):
         'removed_leaks': len(removed_leaks)
     })
 
-def main(first_dir, second_dir, output_file):
-    # Create or open the output CSV file
+def main(report1_zip, report2_zip, output_file):
+    # Create temporary directories to extract reports
+    report1_dir = "./report1"
+    report2_dir = "./report2"
+    
+    os.makedirs(report1_dir, exist_ok=True)
+    os.makedirs(report2_dir, exist_ok=True)
+
+    # Step 1: Unzip the files
+    unzip_file(report1_zip, report1_dir)
+    unzip_file(report2_zip, report2_dir)
+
+    # Step 2: Create or open the output CSV file for comparison results
     with open(output_file, mode='w', newline='', encoding='utf-8') as f:
         fieldnames = ['repo', 'added_leaks', 'removed_leaks']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
-        # Iterate through CSV files in the first directory
-        for root, _, files in os.walk(first_dir):
+        # Step 3: Iterate through CSV files in the first directory
+        for root, _, files in os.walk(report1_dir):
             for file in files:
                 if file.endswith('.csv'):
                     repo_name = os.path.basename(file)
-                    first_file = os.path.join(first_dir, file)
-                    second_file = os.path.join(second_dir, file)
+                    first_file = os.path.join(report1_dir, file)
+                    second_file = os.path.join(report2_dir, file)
 
-                    # Check if the second report for the same repo exists
+                    # Step 4: Check if the second report for the same repo exists
                     if os.path.exists(second_file):
                         # Read both CSV reports
                         first_report = read_csv(first_file)
@@ -59,13 +76,12 @@ def main(first_dir, second_dir, output_file):
                         print(f"Warning: {repo_name} not found in second report directory.")
 
 if __name__ == '__main__':
-    # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Compare Gitleaks scan reports")
-    parser.add_argument('--first-dir', required=True, help="Directory of first Gitleaks scan report CSVs")
-    parser.add_argument('--second-dir', required=True, help="Directory of second Gitleaks scan report CSVs")
+    parser.add_argument('--report1-zip', required=True, help="Path to the first Gitleaks report zip file")
+    parser.add_argument('--report2-zip', required=True, help="Path to the second Gitleaks report zip file")
     parser.add_argument('--output', required=True, help="Output CSV file for comparison results")
     
     args = parser.parse_args()
 
     # Run the comparison process
-    main(args.first_dir, args.second_dir, args.output)
+    main(args.report1_zip, args.report2_zip, args.output)
