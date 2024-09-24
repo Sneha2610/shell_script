@@ -6,8 +6,14 @@ def get_csv_files(folder):
     return [file for file in os.listdir(folder) if file.endswith('.csv')]
 
 def read_csv_data(folder, file_name):
-    """Read a CSV file and return its DataFrame."""
+    """Read a CSV file and return its DataFrame, handling empty files."""
     file_path = os.path.join(folder, file_name)
+    
+    # Check if the file is empty before reading
+    if os.path.getsize(file_path) == 0:
+        print(f"Warning: The file '{file_name}' is empty.")
+        return pd.DataFrame()  # Return an empty DataFrame
+
     return pd.read_csv(file_path)
 
 def compare_csv_files(folder1, folder2):
@@ -21,6 +27,10 @@ def compare_csv_files(folder1, folder2):
         if file in folder2_files:
             df1 = read_csv_data(folder1, file)
             df2 = read_csv_data(folder2, file)
+
+            # Skip comparison if either DataFrame is empty
+            if df1.empty or df2.empty:
+                continue
 
             # Perform comparison
             for index, row in df1.iterrows():
@@ -63,8 +73,8 @@ def save_comparison_report(comparison_df, output_file):
     comparison_df.to_csv(output_file, index=False)
 
 # Specify your folder paths here
-folder1 = 'C:/path/to/Reportv7'  # Replace with the actual path to Folder 1
-folder2 = 'C:/path/to/Reportv8'  # Replace with the actual path to Folder 2
+folder1 = 'Reportv7'  # Replace with the actual path to Folder 1
+folder2 = 'Reportv8'  # Replace with the actual path to Folder 2
 
 # Compare CSV files and save the report
 comparison_df = compare_csv_files(folder1, folder2)
@@ -74,4 +84,4 @@ if not comparison_df.empty:
     save_comparison_report(comparison_df, 'comparison_report.csv')
     print("Comparison report generated successfully: 'comparison_report.csv'")
 else:
-    print("No common CSV files found for comparison.")
+    print("No common CSV files found for comparison or all files are empty.")
