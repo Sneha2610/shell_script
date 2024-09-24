@@ -22,37 +22,28 @@ def compare_csv_files(folder1, folder2):
             df1 = read_csv_data(folder1, file)
             df2 = read_csv_data(folder2, file)
 
-            # Perform comparison
+            # Perform comparison based on 'ID' or other unique identifier
             for index, row in df1.iterrows():
                 id_value = row['ID']
+                comparison_row = {'ID': id_value, 'Name': row['Name'], 'Value': row['Value']}
+
                 if id_value in df2['ID'].values:
-                    comparison_results.append({
-                        'ID': id_value,
-                        'Name': row['Name'],
-                        'Value': row['Value'],
-                        'Availability in reportV7': 'Available',
-                        'Availability in reportV8': 'Available'
-                    })
+                    comparison_row['Availability in reportV7'] = 'Available'
+                    comparison_row['Availability in reportV8'] = 'Available'
                 else:
-                    comparison_results.append({
-                        'ID': id_value,
-                        'Name': row['Name'],
-                        'Value': row['Value'],
-                        'Availability in reportV7': 'Available',
-                        'Availability in reportV8': 'Unavailable'
-                    })
+                    comparison_row['Availability in reportV7'] = 'Available'
+                    comparison_row['Availability in reportV8'] = 'Unavailable'
+
+                comparison_results.append(comparison_row)
 
             # Check for rows in df2 that are not in df1
             for index, row in df2.iterrows():
                 id_value = row['ID']
                 if id_value not in df1['ID'].values:
-                    comparison_results.append({
-                        'ID': id_value,
-                        'Name': row['Name'],
-                        'Value': row['Value'],
-                        'Availability in reportV7': 'Unavailable',
-                        'Availability in reportV8': 'Available'
-                    })
+                    comparison_row = {'ID': id_value, 'Name': row['Name'], 'Value': row['Value']}
+                    comparison_row['Availability in reportV7'] = 'Unavailable'
+                    comparison_row['Availability in reportV8'] = 'Available'
+                    comparison_results.append(comparison_row)
 
     # Create a DataFrame for the comparison results
     comparison_df = pd.DataFrame(comparison_results)
