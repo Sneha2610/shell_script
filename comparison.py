@@ -16,17 +16,12 @@ def read_csv_data(folder, file_name):
 
     df = pd.read_csv(file_path)
     
-    # Print the columns to debug
-    print(f"Columns in {file_name}: {df.columns.tolist()}")
-    
     return df
 
-def compare_csv_files(folder1, folder2):
-    """Compare CSV files in two folders and generate a comparison report."""
+def compare_csv_files(folder1, folder2, output_folder):
+    """Compare CSV files in two folders and generate individual comparison reports."""
     folder1_files = get_csv_files(folder1)
     folder2_files = get_csv_files(folder2)
-
-    comparison_results = []
 
     for file in folder1_files:
         if file in folder2_files:
@@ -42,14 +37,15 @@ def compare_csv_files(folder1, folder2):
                 print(f"Warning: The file '{file}' is missing the 'ID' column.")
                 continue
 
-            # Perform comparison
+            # Perform comparison and create a new DataFrame
+            comparison_results = []
             for index, row in df1.iterrows():
                 id_value = row['ID']
                 if id_value in df2['ID'].values:
                     comparison_results.append({
                         'ID': id_value,
-                        'Name': row.get('Name', 'N/A'),  # Use .get() to avoid KeyError
-                        'Value': row.get('Value', 'N/A'),  # Use .get() to avoid KeyError
+                        'Name': row.get('Name', 'N/A'),
+                        'Value': row.get('Value', 'N/A'),
                         'Availability in reportV7': 'Available',
                         'Availability in reportV8': 'Available'
                     })
@@ -74,24 +70,23 @@ def compare_csv_files(folder1, folder2):
                         'Availability in reportV8': 'Available'
                     })
 
-    # Create a DataFrame for the comparison results
-    comparison_df = pd.DataFrame(comparison_results)
-    return comparison_df
+            # Create a DataFrame for the comparison results
+            comparison_df = pd.DataFrame(comparison_results)
 
-def save_comparison_report(comparison_df, output_file):
-    """Save the comparison report to a CSV file."""
-    comparison_df.to_csv(output_file, index=False)
+            # Save the comparison report for this file
+            output_file = os.path.join(output_folder, f'comparison_{file}')
+            comparison_df.to_csv(output_file, index=False)
+            print(f"Comparison report for {file} saved as {output_file}")
 
 # Specify your folder paths here
 folder1 = 'C:/path/to/Reportv7'  # Replace with the actual path to Folder 1
 folder2 = 'C:/path/to/Reportv8'  # Replace with the actual path to Folder 2
+output_folder = 'C:/path/to/output'  # Replace with the path to save comparison reports
 
-# Compare CSV files and save the report
-comparison_df = compare_csv_files(folder1, folder2)
+# Create output folder if it doesn't exist
+os.makedirs(output_folder, exist_ok=True)
 
-# Check if comparison_df is empty before saving
-if not comparison_df.empty:
-    save_comparison_report(comparison_df, 'comparison_report.csv')
-    print("Comparison report generated successfully: 'comparison_report.csv'")
-else:
-    print("No common CSV files found for comparison or all files are empty.")
+# Compare CSV files and save individual comparison reports
+compare_csv_files(folder1, folder2, output_folder)
+
+print("Comparison completed for all common CSV files.")
