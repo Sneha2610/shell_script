@@ -1,15 +1,11 @@
 import os
 import pandas as pd
-import zipfile
-
-def extract_zip(zip_path, extract_to):
-    """Extract a zip file to a given folder."""
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(extract_to)
 
 def get_csv_files(folder):
     """Get a list of CSV files in a specified folder."""
-    return [file for file in os.listdir(folder) if file.endswith('.csv')]
+    csv_files = [file for file in os.listdir(folder) if file.endswith('.csv')]
+    print(f"CSV files found in {folder}: {csv_files}")
+    return csv_files
 
 def read_csv_data(file_path):
     """Read a CSV file and return its DataFrame, handling empty files."""
@@ -54,18 +50,13 @@ def compare_csv_files(folder1, folder2, output_folder):
             output_file = os.path.join(output_folder, f'comparison_{file}')
             comparison_df.to_csv(output_file, index=False)
             print(f"Comparison report saved for {file} at {output_file}")
+        else:
+            print(f"File {file} found in folder1 but not in folder2.")
 
-# Paths for zip files and extraction folders
-reportv7_zip = 'path_to_reportv7.zip'
-reportv8_zip = 'path_to_reportv8.zip'
-
-folder1 = 'path_to_extract_reportv7'  # Folder to extract reportv7.zip
-folder2 = 'path_to_extract_reportv8'  # Folder to extract reportv8.zip
-output_folder = 'path_to_output_comparisons'  # Folder to save the comparison reports
-
-# Extract the zip files
-extract_zip(reportv7_zip, folder1)
-extract_zip(reportv8_zip, folder2)
+# Specify the paths for folder1, folder2, and the output folder
+folder1 = 'ReportV7'  # Replace with the path to Folder 1
+folder2 = 'ReportV8'  # Replace with the path to Folder 2
+output_folder = 'comparison_output'  # Folder to save the comparison reports
 
 # Create output folder if it doesn't exist
 os.makedirs(output_folder, exist_ok=True)
