@@ -29,10 +29,10 @@ def write_comparison_csv(file_name, added, removed, output_dir, fieldnames):
     output_file = os.path.join(output_dir, f"comparison_{file_name}")
 
     # Add an extra column "Change" to indicate where the row was added/removed
-    fieldnames.append('Change')
+    fieldnames_with_change = fieldnames + ['Change']
 
     with open(output_file, mode='w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames_with_change)
         writer.writeheader()
 
         for row in added:
@@ -49,10 +49,10 @@ def write_comparison_csv(file_name, added, removed, output_dir, fieldnames):
 
 def append_to_summary_csv(summary_file, file_name, added, removed, fieldnames):
     """Appends the comparison summary of a single file to the summary CSV."""
-    fieldnames.append('Change')
+    fieldnames_with_file_name = ['file_name'] + fieldnames + ['Change']
 
     with open(summary_file, mode='a', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames_with_file_name)
 
         # Check if the file is empty and write the header if needed
         if f.tell() == 0:
