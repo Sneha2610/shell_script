@@ -1,124 +1,71 @@
 import os
-import csv
-import argparse
+import pandas as pd
 
-def read_csv(file_path):
-    """Reads a CSV file and returns its content as a list of dictionaries."""
-    data = []
-    try:
-        with open(file_path, mode='r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                data.append(row)
-    except Exception as e:
-        print(f"Error reading CSV file {file_path}: {e}")
-    return data
+def get_csv_files(folder):
+    """Get a list of CSV files in a specified folder."""
+    return [file for file in os.listdir(folder) if file.endswith('.csv')]
 
-def compare_csv_data(data1, data2):
-    """Compares two lists of dictionaries and returns added and removed rows."""
-    set1 = {tuple(row.items()) for row in data1}
-    set2 = {tuple(row.items()) for row in data2}
+def read_csv_data(folder, file_name):
+    """Read a CSV file and return its DataFrame."""
+    file_path = os.path.join(folder, file_name)
+    return pd.read_csv(file_path)
 
-    added = set2 - set1  # Rows added to folder2
-    removed = set1 - set2  # Rows removed from folder1
+def compare_csv_files(folder1, folder2):
+    """Compare CSV files in two folders and generate a comparison report."""
+    folder1_files = get_csv_files(folder1)
+    folder2_files = get_csv_files(folder2)
 
-    return added, removed
+    comparison_results = []
 
-def write_comparison_csv(file_name, added, removed, output_dir, fieldnames):
-    """Writes the comparison result to a CSV file with an extra column for changes."""
-    output_file = os.path.join(output_dir, f"comparison_{file_name}")
+    for file in folder1_files:
+        if file in folder2_files:
+            df1 = read_csv_data(folder1, file)
+            df2 = read_csv_data(folder2, file)
 
-    # Add an extra column "Change" to indicate where the row was added/removed
-    fieldnames_with_change = fieldnames + ['Change']
+            # Perform comparison
+            for index, row in df1.iterrows():
+                id_value = row['ID']
+                if id_value in df2['ID'].values:
+                    comparison_results.append({
+                        'ID': id_value,
+                        'Name': row['Name'],
+                        'Value': row['Value'],
+                        'Availability in reportV7': 'Available',
+                        'Availability in reportV8': 'Available'
+                    })
+                else:
+                    comparison_results.append({
+                        'ID': id_value,
+                        'Name': row['Name'],
+                        'Value': row['Value'],
+                        'Availability in reportV7': 'Available',
+                        'Availability in reportV8': 'Unavailable'
+                    })
 
-    with open(output_file, mode='w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames_with_change)
-        writer.writeheader()
+            # Check for rows in df2 that are not in df1
+            for index, row in df2.iterrows():
+                id_value = row['ID']
+                if id_value not in df1['ID'].values:
+                    comparison_results.append({
+                        'ID': id_value,
+                        'Name': row['Name'],
+                        'Value': row['Value'],
+                        'Availability in reportV7': 'Unavailable',
+                        'Availability in reportV8': 'Available'
+                    })
 
-        for row in added:
-            row_dict = dict(row)
-            row_dict['Change'] = 'Added in folder2'
-            writer.writerow(row_dict)
+    # Create a DataFrame for the comparison results
+    comparison_df = pd.DataFrame(comparison_results)
+    return comparison_df
 
-        for row in removed:
-            row_dict = dict(row)
-            row_dict['Change'] = 'Removed from folder1'
-            writer.writerow(row_dict)
+def save_comparison_report(comparison_df, output_file):
+    """Save the comparison report to a CSV file."""
+    comparison_df.to_csv(output_file, index=False)
 
-    print(f"Comparison report saved: {output_file}")
+# Specify your folder paths here
+folder1 = 'path/to/folder1'  # Replace with the path to Folder 1
+folder2 = 'path/to/folder2'  # Replace with the path to Folder 2
 
-def append_to_summary_csv(summary_file, file_name, added, removed, fieldnames):
-    """Appends the comparison summary of a single file to the summary CSV."""
-    fieldnames_with_file_name = ['file_name'] + fieldnames + ['Change']
-
-    with open(summary_file, mode='a', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames_with_file_name)
-
-        # Check if the file is empty and write the header if needed
-        if f.tell() == 0:
-            writer.writeheader()
-
-        for row in added:
-            row_dict = dict(row)
-            row_dict['Change'] = 'Added in folder2'
-            row_dict['file_name'] = file_name
-            writer.writerow(row_dict)
-
-        for row in removed:
-            row_dict = dict(row)
-            row_dict['Change'] = 'Removed from folder1'
-            row_dict['file_name'] = file_name
-            writer.writerow(row_dict)
-
-def compare_csv_files_in_folders(folder1, folder2, output_dir):
-    """Compares CSV files with common names in two folders and generates comparison reports."""
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Create a summary comparison CSV file
-    summary_file = os.path.join(output_dir, "summary_comparison.csv")
-
-    # List CSV files in both folders
-    folder1_files = {file for file in os.listdir(folder1) if file.endswith('.csv')}
-    folder2_files = {file for file in os.listdir(folder2) if file.endswith('.csv')}
-
-    # Find common files between the two folders
-    common_files = folder1_files.intersection(folder2_files)
-
-    # Compare each common CSV file
-    for file_name in common_files:
-        file1_path = os.path.join(folder1, file_name)
-        file2_path = os.path.join(folder2, file_name)
-
-        # Read CSV files
-        data1 = read_csv(file1_path)
-        data2 = read_csv(file2_path)
-
-        if not data1 and not data2:
-            print(f"Skipping {file_name}: No data found in both files.")
-            continue
-
-        # Get the fieldnames (column headers) from the first row if data exists
-        fieldnames = list(data1[0].keys() if data1 else data2[0].keys())
-
-        # Compare the data
-        added, removed = compare_csv_data(data1, data2)
-
-        # Write comparison result to CSV with "Change" column
-        write_comparison_csv(file_name, added, removed, output_dir, fieldnames)
-
-        # Append the changes to the summary CSV
-        append_to_summary_csv(summary_file, file_name, added, removed, fieldnames)
-
-    print(f"Comparison completed. Individual reports and summary saved in {output_dir}.")
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Compare CSV files from two folders and generate comparison reports.")
-    parser.add_argument('--folder1', required=True, help="Path to the first folder containing CSV files")
-    parser.add_argument('--folder2', required=True, help="Path to the second folder containing CSV files")
-    parser.add_argument('--output-dir', required=True, help="Output directory to save the comparison CSV files")
-    
-    args = parser.parse_args()
-
-    # Run the comparison
-    compare_csv_files_in_folders(args.folder1, args.folder2, args.output_dir)
+# Compare CSV files and save the report
+comparison_df = compare_csv_files(folder1, folder2)
+save_comparison_report(comparison_df, 'comparison_report.csv')
