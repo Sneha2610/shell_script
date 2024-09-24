@@ -14,6 +14,16 @@ def read_csv_data(file_path):
         return pd.DataFrame()  # Return an empty DataFrame
     return pd.read_csv(file_path)
 
+def align_data_types(df1, df2):
+    """Ensure the data types are aligned between two DataFrames."""
+    common_columns = df1.columns.intersection(df2.columns)
+    for col in common_columns:
+        if df1[col].dtype != df2[col].dtype:
+            # Convert to string if the types are mismatched to avoid merge issues
+            df1[col] = df1[col].astype(str)
+            df2[col] = df2[col].astype(str)
+    return df1, df2
+
 def compare_csv_files(folder1, folder2, output_folder):
     """Compare CSV files in two folders and generate comparison reports."""
     folder1_files = get_csv_files(folder1)
@@ -28,23 +38,24 @@ def compare_csv_files(folder1, folder2, output_folder):
                 print(f"Skipping comparison for {file} due to empty data.")
                 continue
 
-            # Perform an outer join on all columns
-            comparison_df = pd.merge(df1, df2, on=list(df1.columns), how='outer', indicator=True)
+            # Align data types between the two DataFrames
+            df1, df2 = align_data_types(df1, df2)
 
-            # Add Availability Columns for each report
-            comparison_df['Availability in reportV7'] = comparison_df['_merge'].map({
-                'left_only': 'Available',
-                'right_only': 'Unavailable',
-                'both': 'Available'
-            })
-            comparison_df['Availability in reportV8'] = comparison_df['_merge'].map({
-                'left_only': 'Unavailable',
-                'right_only': 'Available',
-                'both': 'Available'
-            })
+            # Concatenate the DataFrames for comparison, adding an identifier column for each source
+            df1['Source'] = 'reportV7'
+            df2['Source'] = 'reportV8'
+            comparison_df = pd.concat([df1, df2])
 
-            # Drop the '_merge' column used by pd.merge
-            comparison_df.drop(columns=['_merge'], inplace=True)
+            # Add the Availability columns based on the source
+            comparison_df['Availability in reportV7'] = comparison_df['Source'].apply(
+                lambda x: 'Available' if x == 'reportV7' else 'Unavailable'
+            )
+            comparison_df['Availability in reportV8'] = comparison_df['Source'].apply(
+                lambda x: 'Available' if x == 'reportV8' else 'Unavailable'
+            )
+
+            # Drop the 'Source' column as it's no longer needed
+            comparison_df.drop(columns=['Source'], inplace=True)
 
             # Save the comparison result
             output_file = os.path.join(output_folder, f'comparison_{file}')
