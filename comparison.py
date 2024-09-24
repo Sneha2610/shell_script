@@ -5,10 +5,13 @@ import argparse
 def read_csv(file_path):
     """Reads a CSV file and returns its content as a list of dictionaries."""
     data = []
-    with open(file_path, mode='r', newline='', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            data.append(row)
+    try:
+        with open(file_path, mode='r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                data.append(row)
+    except Exception as e:
+        print(f"Error reading CSV file {file_path}: {e}")
     return data
 
 def compare_csv_data(data1, data2):
@@ -95,8 +98,18 @@ def compare_csv_files_in_folders(folder1, folder2, output_dir):
         data1 = read_csv(file1_path)
         data2 = read_csv(file2_path)
 
-        # Get the fieldnames (column headers)
-        fieldnames = data1[0].keys() if data1 else data2[0].keys()
+        if not data1 and not data2:
+            print(f"Skipping {file_name}: No data found in both files.")
+            continue
+
+        # Get the fieldnames (column headers) from the first row if data exists
+        if data1:
+            fieldnames = data1[0].keys()
+        elif data2:
+            fieldnames = data2[0].keys()
+        else:
+            print(f"Skipping {file_name}: Empty data in both files.")
+            continue
 
         # Compare the data
         added, removed = compare_csv_data(data1, data2)
