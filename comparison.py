@@ -1,87 +1,79 @@
 import os
-import zipfile
-import argparse
 import csv
-
-def unzip_file(zip_path, extract_to):
-    """Unzips a file to a specified directory."""
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(extract_to)
+import argparse
 
 def read_csv(file_path):
     """Reads a CSV file and returns its content as a list of dictionaries."""
-    leaks = []
+    data = []
     with open(file_path, mode='r', newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            leaks.append(row)
-    return leaks
+            data.append(row)
+    return data
 
-def compare_reports(first_report, second_report):
-    """Compares two Gitleaks CSV reports and identifies added and removed leaks."""
-    first_leaks = set(tuple(sorted(row.items())) for row in first_report)
-    second_leaks = set(tuple(sorted(row.items())) for row in second_report)
+def compare_csv_data(data1, data2):
+    """Compares two lists of dictionaries and returns added, removed, and changed rows."""
+    set1 = set(tuple(sorted(row.items())) for row in data1)
+    set2 = set(tuple(sorted(row.items())) for row in data2)
 
-    added_leaks = second_leaks - first_leaks
-    removed_leaks = first_leaks - second_leaks
+    added = set2 - set1
+    removed = set1 - set2
 
-    return added_leaks, removed_leaks
+    return added, removed
 
-def write_comparison_result(repo_name, added_leaks, removed_leaks, writer):
-    """Writes the comparison results for a single repo to the output CSV."""
-    writer.writerow({
-        'repo': repo_name,
-        'added_leaks': len(added_leaks),
-        'removed_leaks': len(removed_leaks)
-    })
+def write_comparison_csv(file_name, added, removed, output_dir):
+    """Writes the comparison result to a CSV file."""
+    output_file = os.path.join(output_dir, f"comparison_{file_name}")
 
-def main(report1_zip, report2_zip, output_file):
-    # Create temporary directories to extract reports
-    report1_dir = "./report1"
-    report2_dir = "./report2"
-    
-    os.makedirs(report1_dir, exist_ok=True)
-    os.makedirs(report2_dir, exist_ok=True)
-
-    # Step 1: Unzip the files
-    unzip_file(report1_zip, report1_dir)
-    unzip_file(report2_zip, report2_dir)
-
-    # Step 2: Create or open the output CSV file for comparison results
     with open(output_file, mode='w', newline='', encoding='utf-8') as f:
-        fieldnames = ['repo', 'added_leaks', 'removed_leaks']
+        fieldnames = ['type', 'content']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
-        # Step 3: Iterate through CSV files in the first directory
-        for root, _, files in os.walk(report1_dir):
-            for file in files:
-                if file.endswith('.csv'):
-                    repo_name = os.path.basename(file)
-                    first_file = os.path.join(report1_dir, file)
-                    second_file = os.path.join(report2_dir, file)
+        for row in added:
+            writer.writerow({'type': 'added', 'content': dict(row)})
 
-                    # Step 4: Check if the second report for the same repo exists
-                    if os.path.exists(second_file):
-                        # Read both CSV reports
-                        first_report = read_csv(first_file)
-                        second_report = read_csv(second_file)
+        for row in removed:
+            writer.writerow({'type': 'removed', 'content': dict(row)})
 
-                        # Compare reports and identify differences
-                        added_leaks, removed_leaks = compare_reports(first_report, second_report)
+    print(f"Comparison report saved: {output_file}")
 
-                        # Write comparison results to the output CSV
-                        write_comparison_result(repo_name, added_leaks, removed_leaks, writer)
-                    else:
-                        print(f"Warning: {repo_name} not found in second report directory.")
+def compare_csv_files_in_folders(folder1, folder2, output_dir):
+    """Compares CSV files with common names in two folders and generates comparison reports."""
+    # Ensure the output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # List CSV files in both folders
+    folder1_files = {file for file in os.listdir(folder1) if file.endswith('.csv')}
+    folder2_files = {file for file in os.listdir(folder2) if file.endswith('.csv')}
+
+    # Find common files between the two folders
+    common_files = folder1_files.intersection(folder2_files)
+
+    # Compare each common CSV file
+    for file_name in common_files:
+        file1_path = os.path.join(folder1, file_name)
+        file2_path = os.path.join(folder2, file_name)
+
+        # Read CSV files
+        data1 = read_csv(file1_path)
+        data2 = read_csv(file2_path)
+
+        # Compare the data
+        added, removed = compare_csv_data(data1, data2)
+
+        # Write comparison result to CSV
+        write_comparison_csv(file_name, added, removed, output_dir)
+
+    print(f"Comparison completed. Reports saved in {output_dir}.")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Compare Gitleaks scan reports")
-    parser.add_argument('--report1-zip', required=True, help="Path to the first Gitleaks report zip file")
-    parser.add_argument('--report2-zip', required=True, help="Path to the second Gitleaks report zip file")
-    parser.add_argument('--output', required=True, help="Output CSV file for comparison results")
+    parser = argparse.ArgumentParser(description="Compare CSV files from two folders and generate comparison reports.")
+    parser.add_argument('--folder1', required=True, help="Path to the first folder containing CSV files")
+    parser.add_argument('--folder2', required=True, help="Path to the second folder containing CSV files")
+    parser.add_argument('--output-dir', required=True, help="Output directory to save the comparison CSV files")
     
     args = parser.parse_args()
 
-    # Run the comparison process
-    main(args.report1_zip, args.report2_zip, args.output)
+    # Run the comparison
+    compare_csv_files_in_folders(args.folder1, args.folder2, args.output_dir)
