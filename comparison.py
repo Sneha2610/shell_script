@@ -12,36 +12,72 @@ def read_csv(file_path):
     return data
 
 def compare_csv_data(data1, data2):
-    """Compares two lists of dictionaries and returns added, removed, and changed rows."""
+    """Compares two lists of dictionaries and returns added and removed rows."""
     set1 = set(tuple(sorted(row.items())) for row in data1)
     set2 = set(tuple(sorted(row.items())) for row in data2)
 
-    added = set2 - set1
-    removed = set1 - set2
+    added = set2 - set1  # Rows added to folder2
+    removed = set1 - set2  # Rows removed from folder1
 
     return added, removed
 
-def write_comparison_csv(file_name, added, removed, output_dir):
-    """Writes the comparison result to a CSV file."""
+def write_comparison_csv(file_name, added, removed, output_dir, fieldnames):
+    """Writes the comparison result to a CSV file with an extra column for changes."""
     output_file = os.path.join(output_dir, f"comparison_{file_name}")
 
+    # Add an extra column "Change" to indicate where the row was added/removed
+    fieldnames.append('Change')
+
     with open(output_file, mode='w', newline='', encoding='utf-8') as f:
-        fieldnames = ['type', 'content']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
 
         for row in added:
-            writer.writerow({'type': 'added', 'content': dict(row)})
+            row_dict = dict(row)
+            row_data = {key: value for key, value in row_dict}
+            row_data['Change'] = 'Added in folder2'
+            writer.writerow(row_data)
 
         for row in removed:
-            writer.writerow({'type': 'removed', 'content': dict(row)})
+            row_dict = dict(row)
+            row_data = {key: value for key, value in row_dict}
+            row_data['Change'] = 'Removed from folder1'
+            writer.writerow(row_data)
 
     print(f"Comparison report saved: {output_file}")
+
+def append_to_summary_csv(summary_file, file_name, added, removed, fieldnames):
+    """Appends the comparison summary of a single file to the summary CSV."""
+    fieldnames.append('Change')
+
+    with open(summary_file, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+        # Check if the file is empty and write the header if needed
+        if f.tell() == 0:
+            writer.writeheader()
+
+        for row in added:
+            row_dict = dict(row)
+            row_data = {key: value for key, value in row_dict}
+            row_data['Change'] = 'Added in folder2'
+            row_data['file_name'] = file_name
+            writer.writerow(row_data)
+
+        for row in removed:
+            row_dict = dict(row)
+            row_data = {key: value for key, value in row_dict}
+            row_data['Change'] = 'Removed from folder1'
+            row_data['file_name'] = file_name
+            writer.writerow(row_data)
 
 def compare_csv_files_in_folders(folder1, folder2, output_dir):
     """Compares CSV files with common names in two folders and generates comparison reports."""
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
+
+    # Create a summary comparison CSV file
+    summary_file = os.path.join(output_dir, "summary_comparison.csv")
 
     # List CSV files in both folders
     folder1_files = {file for file in os.listdir(folder1) if file.endswith('.csv')}
@@ -59,13 +95,19 @@ def compare_csv_files_in_folders(folder1, folder2, output_dir):
         data1 = read_csv(file1_path)
         data2 = read_csv(file2_path)
 
+        # Get the fieldnames (column headers)
+        fieldnames = data1[0].keys() if data1 else data2[0].keys()
+
         # Compare the data
         added, removed = compare_csv_data(data1, data2)
 
-        # Write comparison result to CSV
-        write_comparison_csv(file_name, added, removed, output_dir)
+        # Write comparison result to CSV with "Change" column
+        write_comparison_csv(file_name, added, removed, output_dir, list(fieldnames))
 
-    print(f"Comparison completed. Reports saved in {output_dir}.")
+        # Append the changes to the summary CSV
+        append_to_summary_csv(summary_file, file_name, added, removed, list(fieldnames))
+
+    print(f"Comparison completed. Individual reports and summary saved in {output_dir}.")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Compare CSV files from two folders and generate comparison reports.")
