@@ -1,0 +1,36 @@
+Subject: Action Required: Secrets Detected in Gitleaks Scan Reports - Please Remediate
+
+Hi Team,
+
+As part of our regular security reviews, we conducted Gitleaks scans on the repositories, and some secrets have been detected. To maintain the security of our codebase, these findings need immediate remediation.
+
+Summary of Findings:
+Repository Name	Leaks Found	Whitelisting Applied (Yes/No)
+Repo 1	5	Yes
+Repo 2	3	No
+Repo 3	8	Yes
+Repo 4	0	No
+...	...	...
+This table contains a sample of the findings. The full report is attached for your review.
+
+Next Steps:
+Review the Findings: Check the repositories owned by your team and examine the secrets flagged in the attached report.
+Remediation: Follow the appropriate security practices (such as rotating secrets, removing sensitive information, or configuring proper access) to remediate the findings.
+Confirmation: After remediation, please confirm the actions taken by responding to this email or updating the related ticket.
+Target Date: Please complete the remediation process by [specific deadline date] to ensure we remain in compliance with security policies.
+
+If you need any assistance, feel free to reach out to me or the security team for further guidance.
+
+Thank you for your prompt attention to this important security matter.
+
+Best regards,
+Sneha S
+DevSecOps Engineer
+[Your Company Name]
+
+Key Notes:
+Table of Findings: The table gives a clear summary of the repositories, the number of leaks found, and whether whitelisting was applied.
+Attachments: Mention that the full report is attached for detailed findings.
+Deadline: Specify a target date for completion.
+Confirmation: Ask teams to confirm remediation.
+You can adjust the table's content with the actual data you have. Let me know if you need any further changes!
