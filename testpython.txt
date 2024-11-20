@@ -1,0 +1,42 @@
+steps:
+- task: PythonScript@0
+  displayName: Secrets Scanning - Validate whitelist file
+  inputs:
+    scriptSource: 'inline'
+    script: |
+      import os
+
+      # Paths
+      ruleFilePath = os.path.join(os.getenv('System_DefaultWorkingDirectory', ''), 'gitleaks-config/rules-v8.toml')
+      whitelistFilePath = os.path.join(
+          os.getenv('System_DefaultWorkingDirectory', ''),
+          'gitleaks-config/{}/{}'.format(
+              os.getenv('System_TeamProject', ''),
+              os.getenv('Build_Repository_Name', 'gitleaks.toml')
+          )
+      )
+
+      # Function to read and extract lines after the "description" in file2
+      def extract_lines_after_description(file_path):
+          lines_to_append = []
+          found_description = False
+          with open(file_path, 'r') as f:
+              for line in f:
+                  if found_description:
+                      lines_to_append.append(line)
+                  elif line.strip().startswith("description"):
+                      found_description = True
+          return lines_to_append
+
+      # Function to append lines to file1
+      def append_to_file1(rule_file_path, lines):
+          with open(rule_file_path, 'a') as f:
+              f.write('\n')  # Ensure there's a newline before appending
+              f.writelines(lines)
+
+      # Main logic
+      if os.path.exists(whitelistFilePath):
+          lines_after_description = extract_lines_after_description(whitelistFilePath)
+          append_to_file1(ruleFilePath, lines_after_description)
+      else:
+          print("{} does not exist.".format(whitelistFilePath))
