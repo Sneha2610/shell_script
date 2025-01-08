@@ -15,7 +15,10 @@ def generate_rules_toml(ip_list, output_file):
     rule = {
         "description": "Detect specified IPs",
         "regex": combined_regex,
-        "tags": ["ip"]
+        "tags": ["ip"],
+        "allowlist": {
+            "paths": []
+        }
     }
 
     # Create the rules dictionary
