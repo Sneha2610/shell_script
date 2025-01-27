@@ -60,6 +60,11 @@ def append_paths_to_rules_file(ruleFilePath, paths):
     with open(ruleFilePath, 'w') as f:
         f.writelines(updated_lines)
 
+    # Print the contents of the file after appending
+    print("\nUpdated rules file content:\n")
+    with open(ruleFilePath, 'r') as f:
+        print(f.read())
+
 # Main logic
 if os.path.exists(whitelistFilePath):
     # Extract lines after the "description"
