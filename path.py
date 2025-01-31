@@ -1,4 +1,5 @@
 import os
+import toml
 
 # Define file paths
 ruleFilePath = os.path.expandvars('$(System.DefaultWorkingDirectory)/gitleaks-config/rules-v8.toml')
@@ -7,67 +8,50 @@ whitelistFilePath = os.path.expandvars('$(System.DefaultWorkingDirectory)/gitlea
 print(f"Rule File Path: {ruleFilePath}")
 print(f"Whitelist File Path: {whitelistFilePath}")
 
-# Function to extract allowlist paths from the whitelist file
-def extract_paths_from_whitelist(file_path):
-    paths = []
-    in_allowlist_paths = False
+# Function to load TOML file
+def load_toml(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            return toml.load(f)
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return {}
 
-    with open(file_path, 'r') as f:
-        for line in f:
-            stripped_line = line.strip()
-            if stripped_line.startswith("[allowlist.paths]"):
-                in_allowlist_paths = True
-                continue  # Skip the section header
-            elif in_allowlist_paths:
-                if stripped_line.startswith("["):  # New section starts, stop reading
-                    break
-                paths.append(stripped_line)  # Collect paths
+# Function to update the global allowlist
+def merge_whitelist_to_rules(ruleFilePath, whitelistFilePath):
+    # Load existing rules and whitelist
+    rules = load_toml(ruleFilePath)
+    whitelist = load_toml(whitelistFilePath)
 
-    print("Extracted paths from whitelist:", paths)
-    return paths
-
-# Function to append new paths to [allowlist.paths] in rules file
-def append_paths_to_rules_file(ruleFilePath, new_paths):
-    if not new_paths:
-        print("No new paths to append.")
+    if "allowlist" not in whitelist:
+        print("No allowlist found in whitelist file.")
         return
+    
+    # Extract paths and regexes from whitelist
+    new_paths = set(whitelist["allowlist"].get("paths", []))
+    new_regexes = set(whitelist["allowlist"].get("regexes", []))
 
-    updated_lines = []
-    allowlist_paths_found = False
-    existing_paths = set()
-    allowlist_index = -1
+    # Ensure the allowlist section exists in rules
+    if "allowlist" not in rules:
+        rules["allowlist"] = {}
 
-    # Read the file and track existing allowlist paths
-    with open(ruleFilePath, 'r') as f:
-        lines = f.readlines()
+    # Merge paths
+    existing_paths = set(rules["allowlist"].get("paths", []))
+    rules["allowlist"]["paths"] = list(existing_paths | new_paths)  # Union of sets
 
-    for i, line in enumerate(lines):
-        updated_lines.append(line)
-        if line.strip().startswith("[allowlist.paths]"):
-            allowlist_paths_found = True
-            allowlist_index = i
-        elif allowlist_paths_found and line.strip():  # If inside allowlist.paths
-            if line.strip().startswith("["):  # Stop if a new section starts
-                break
-            existing_paths.add(line.strip())
+    # Merge regexes
+    existing_regexes = set(rules["allowlist"].get("regexes", []))
+    rules["allowlist"]["regexes"] = list(existing_regexes | new_regexes)  # Union of sets
 
-    # Filter out already existing paths
-    paths_to_add = [path for path in new_paths if path not in existing_paths]
+    # Preserve existing keys like regexesTarget
+    if "regexesTarget" in rules["allowlist"]:
+        rules["allowlist"]["regexesTarget"] = rules["allowlist"]["regexesTarget"]
 
-    if paths_to_add:
-        if allowlist_paths_found:
-            updated_lines.insert(allowlist_index + 1, "\n".join(paths_to_add) + "\n")
-        else:
-            updated_lines.append("\n[allowlist.paths]\n")
-            updated_lines.append("\n".join(paths_to_add) + "\n")
+    # Write back to the rules file
+    with open(ruleFilePath, 'w') as f:
+        toml.dump(rules, f)
 
-        # Write updated content back
-        with open(ruleFilePath, 'w') as f:
-            f.writelines(updated_lines)
-
-        print("Paths appended successfully.")
-    else:
-        print("All whitelist paths already exist in rules file. No changes made.")
+    print("Rules file updated successfully.")
 
 # Print final rules file content
 def print_file_content(file_path):
@@ -80,11 +64,10 @@ def print_file_content(file_path):
 if os.path.exists(whitelistFilePath):
     print("Whitelist file exists. Processing...")
 
-    # Extract and append paths
-    paths = extract_paths_from_whitelist(whitelistFilePath)
-    append_paths_to_rules_file(ruleFilePath, paths)
+    # Merge whitelist into rules
+    merge_whitelist_to_rules(ruleFilePath, whitelistFilePath)
 
-    # Print final file
+    # Print final rules file
     print_file_content(ruleFilePath)
 else:
     print("Whitelist file does NOT exist. Exiting.")
