@@ -8,7 +8,7 @@ whitelistFilePath = os.path.expandvars('$(System.DefaultWorkingDirectory)/gitlea
 print(f"Rule File Path: {ruleFilePath}")
 print(f"Whitelist File Path: {whitelistFilePath}")
 
-# Function to load TOML file
+# Function to load a TOML file
 def load_toml(file_path):
     try:
         with open(file_path, 'r') as f:
@@ -17,7 +17,7 @@ def load_toml(file_path):
         print(f"Error reading {file_path}: {e}")
         return {}
 
-# Function to update the global allowlist
+# Function to update the allowlist in rules without affecting other rules
 def merge_whitelist_to_rules(ruleFilePath, whitelistFilePath):
     # Load existing rules and whitelist
     rules = load_toml(ruleFilePath)
@@ -31,21 +31,24 @@ def merge_whitelist_to_rules(ruleFilePath, whitelistFilePath):
     new_paths = set(whitelist["allowlist"].get("paths", []))
     new_regexes = set(whitelist["allowlist"].get("regexes", []))
 
-    # Ensure the allowlist section exists in rules
+    # Ensure allowlist exists in rules
     if "allowlist" not in rules:
         rules["allowlist"] = {}
 
-    # Merge paths
+    # Merge paths while avoiding duplicates
     existing_paths = set(rules["allowlist"].get("paths", []))
-    rules["allowlist"]["paths"] = list(existing_paths | new_paths)  # Union of sets
+    merged_paths = list(existing_paths | new_paths)  # Union to avoid duplicates
+    rules["allowlist"]["paths"] = merged_paths
 
-    # Merge regexes
+    # Merge regexes while avoiding duplicates
     existing_regexes = set(rules["allowlist"].get("regexes", []))
-    rules["allowlist"]["regexes"] = list(existing_regexes | new_regexes)  # Union of sets
+    merged_regexes = list(existing_regexes | new_regexes)  # Union to avoid duplicates
+    rules["allowlist"]["regexes"] = merged_regexes
 
-    # Preserve existing keys like regexesTarget
-    if "regexesTarget" in rules["allowlist"]:
-        rules["allowlist"]["regexesTarget"] = rules["allowlist"]["regexesTarget"]
+    # Preserve other keys in allowlist (like regexesTarget)
+    for key in rules["allowlist"]:
+        if key not in ["paths", "regexes"]:
+            rules["allowlist"][key] = rules["allowlist"][key]
 
     # Write back to the rules file
     with open(ruleFilePath, 'w') as f:
