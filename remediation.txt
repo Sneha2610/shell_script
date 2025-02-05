@@ -1,0 +1,16 @@
+Remediation Steps for Gitleaks Scan Findings
+Go to the Repository URL
+
+Navigate to the reported repository in your version control system (e.g., GitHub, GitLab, Azure DevOps).
+Locate the Affected File
+
+If the file still exists, go to the reported file path.
+If the file was modified or deleted, check the commit history using the reported commit ID.
+Remediate or Rotate the Exposed Secret
+
+If the secret is still in use, immediately revoke and rotate it.
+Remove the secret from the file and commit the changes securely.
+Handle False Positives
+
+If the finding is a false positive, follow the whitelisting process.
+Refer to the below URL for the whitelisting procedure: [Insert Whitelisting Process URL]
