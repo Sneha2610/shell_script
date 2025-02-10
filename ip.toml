@@ -3,3 +3,8 @@ id = "ip-address"
 description = "Potential hardcoded IP address"
 regex = '''\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'''
 tags = ["key", "IP"]
+
+[[rules]]
+id = "DNS"
+description = "Filter DNS names ending with .azure.com"
+regex = '''[a-zA-Z0-9.-]+\.azure\.com'''
