@@ -6,6 +6,7 @@ import subprocess
 # Configuration
 CSV_FILE = "repositories.csv"  # Path to your input CSV file
 GITLEAKS_BINARY = "./gitleaks"  # Path to Gitleaks binary
+GITLEAKS_CONFIG = "./gitleaks_config.toml"  # Path to your custom Gitleaks rules file
 OUTPUT_CSV = "gitleaks_consolidated_report.csv"  # Final consolidated report
 BRANCHES = ["main", "release"]  # Branches to scan
 
@@ -13,22 +14,23 @@ BRANCHES = ["main", "release"]  # Branches to scan
 TEMP_REPO_DIR = "temp_repo"
 os.makedirs(TEMP_REPO_DIR, exist_ok=True)
 
-# Function to run Gitleaks and collect findings
+# Function to run Gitleaks with custom config
 def run_gitleaks(project, repo, branch):
     repo_url = f"https://dev.azure.com/your-org/{project}/_git/{repo}"  # Modify as needed
     repo_dir = os.path.join(TEMP_REPO_DIR, repo)
 
-    print(f"Scanning {repo} ({branch} branch) from {project}...")
+    print(f"🔍 Scanning {repo} ({branch} branch) from {project}...")
 
     # Clone repository if not already cloned
     if os.path.exists(repo_dir):
         subprocess.run(["rm", "-rf", repo_dir], check=True)
     subprocess.run(["git", "clone", "--branch", branch, repo_url, repo_dir], check=True)
 
-    # Run Gitleaks scan
+    # Run Gitleaks scan with custom config
     report_path = f"{repo}_{branch}.json"
     gitleaks_cmd = [
-        GITLEAKS_BINARY, "detect", "--source", repo_dir,
+        GITLEAKS_BINARY, "detect", "--source", repo_dir, 
+        "--config", GITLEAKS_CONFIG, 
         "--report-format", "json", "--report-path", report_path
     ]
     subprocess.run(gitleaks_cmd, check=True)
