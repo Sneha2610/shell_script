@@ -9,19 +9,34 @@ GITLEAKS_BINARY = "./gitleaks"  # Path to Gitleaks binary
 GITLEAKS_CONFIG = "./gitleaks_config.toml"  # Path to your custom Gitleaks rules file
 OUTPUT_CSV = "gitleaks_consolidated_report.csv"  # Final consolidated report
 BRANCHES = ["main", "release"]  # Branches to scan
+TEMP_REPO_DIR = "temp_repo"
+
+# Ensure PAT is set in the environment
+AZURE_PAT = os.getenv("AZURE_DEVOPS_PAT")
+if not AZURE_PAT:
+    raise ValueError("❌ Error: AZURE_DEVOPS_PAT environment variable is not set!")
 
 # Ensure output directory exists
-TEMP_REPO_DIR = "temp_repo"
 os.makedirs(TEMP_REPO_DIR, exist_ok=True)
 
-# Function to run Gitleaks with custom config
+# Function to check if a branch exists in the repository
+def branch_exists(repo_url, branch):
+    check_branch_cmd = ["git", "ls-remote", "--heads", repo_url, f"refs/heads/{branch}"]
+    result = subprocess.run(check_branch_cmd, capture_output=True, text=True)
+    return bool(result.stdout.strip())
+
+# Function to run Gitleaks
 def run_gitleaks(project, repo, branch):
-    repo_url = f"https://dev.azure.com/your-org/{project}/_git/{repo}"  # Modify as needed
+    repo_url = f"https://{AZURE_PAT}@dev.azure.com/your-org/{project}/_git/{repo}"
     repo_dir = os.path.join(TEMP_REPO_DIR, repo)
 
     print(f"🔍 Scanning {repo} ({branch} branch) from {project}...")
 
-    # Clone repository if not already cloned
+    if not branch_exists(repo_url, branch):
+        print(f"⚠️ Warning: Branch '{branch}' does not exist in {repo}. Skipping...")
+        return []
+
+    # Clone repository
     if os.path.exists(repo_dir):
         subprocess.run(["rm", "-rf", repo_dir], check=True)
     subprocess.run(["git", "clone", "--branch", branch, repo_url, repo_dir], check=True)
