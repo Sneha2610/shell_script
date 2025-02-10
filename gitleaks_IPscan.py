@@ -1,10 +1,13 @@
 import os
 import subprocess
+import json
+import csv
 
 # Environment variables
 GITLEAKS_BINARY = "./gitleaks"  # Update path if needed
 GITLEAKS_CONFIG = "rules.toml"  # Custom Gitleaks config
 GIT_PAT = os.getenv("TOKEN")  # Use environment variable for PAT
+OUTPUT_CSV = "gitleaks_consolidated_report.csv"  # Output CSV file
 
 # Function to scan repo branches
 def scan_repo(project, repo):
@@ -39,10 +42,11 @@ def scan_repo(project, repo):
         
         result = subprocess.run(gitleaks_cmd, check=False)  # Allow failures
         
-        if result.returncode == 0:
-            print(f"✅ No leaks found in {repo} ({branch})")
-        else:
+        if result.returncode != 0:
             print(f"⚠️ Leaks detected in {repo} ({branch}) - See {report_path}")
+            parse_gitleaks_report(report_path, project, repo, branch)
+        else:
+            print(f"✅ No leaks found in {repo} ({branch})")
 
         # Cleanup repo after scan
         subprocess.run(["rm", "-rf", repo_dir], check=False)
@@ -56,8 +60,40 @@ def get_branches(repo_url):
     branches = [line.split("\t")[1].replace("refs/heads/", "") for line in result.stdout.splitlines()]
     return branches
 
+# Function to parse Gitleaks JSON report and append to CSV
+def parse_gitleaks_report(report_path, project, repo, branch):
+    if not os.path.exists(report_path):
+        return
+    
+    with open(report_path, "r") as file:
+        try:
+            leaks = json.load(file)
+        except json.JSONDecodeError:
+            print(f"⚠️ Error decoding JSON: {report_path}")
+            return
+
+    with open(OUTPUT_CSV, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        
+        for leak in leaks:
+            writer.writerow([
+                project, repo, branch, 
+                leak.get("RuleID", ""),
+                leak.get("File", ""),
+                leak.get("Match", ""),
+                leak.get("Secret", ""),
+                leak.get("Fingerprint", "")
+            ])
+
+# Initialize CSV with headers
+with open(OUTPUT_CSV, "w", newline="") as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(["Project", "Repo", "Branch", "RuleID", "File", "Match", "Secret", "Fingerprint"])
+
 # Example usage
 project = "MyProject"
 repo = "MyRepo"
 
 scan_repo(project, repo)
+
+print(f"✅ Consolidated report saved as {OUTPUT_CSV}")
