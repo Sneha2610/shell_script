@@ -5,10 +5,13 @@ import csv
 import argparse
 
 # Parse command-line arguments
-parser = argparse.ArgumentParser(description="Run Gitleaks scan with dynamic rules and project lists")
+parser = argparse.ArgumentParser(description="Run Gitleaks scan with dynamic rules and multiple CSV files")
 parser.add_argument("--rules", required=True, help="Path to rules.toml file")
-parser.add_argument("--csv", required=True, help="Path to projects_repos.csv file")
+parser.add_argument("--csv", required=True, help="Comma-separated CSV file paths")
 args = parser.parse_args()
+
+# Convert CSV argument to a list
+csv_files = args.csv.split(",")
 
 # Environment variables
 GITLEAKS_BINARY = "./gitleaks"  # Update if needed
@@ -28,17 +31,14 @@ def scan_repo(project, repo, rules_file):
     for branch in target_branches:
         repo_dir = f"./{repo}_{branch.replace('/', '_')}"
         
-        # Clone the repository (Handle branch errors)
+        # Clone the repository
         try:
-            subprocess.run(
-                ["git", "clone", "--branch", branch, repo_url, repo_dir],
-                check=True
-            )
+            subprocess.run(["git", "clone", "--branch", branch, repo_url, repo_dir], check=True)
         except subprocess.CalledProcessError:
             print(f"❌ Failed to clone {repo} ({branch})")
-            continue  # Skip to the next branch
+            continue
 
-        # Run Gitleaks scan with custom config
+        # Run Gitleaks scan
         report_path = f"{repo}_{branch.replace('/', '_')}.json"
         gitleaks_cmd = [
             GITLEAKS_BINARY, "detect", "--source", repo_dir, 
@@ -46,7 +46,7 @@ def scan_repo(project, repo, rules_file):
             "--report-format", "json", "--report-path", report_path
         ]
         
-        result = subprocess.run(gitleaks_cmd, check=False)  # Allow failures
+        result = subprocess.run(gitleaks_cmd, check=False)
         
         if result.returncode != 0:
             print(f"⚠️ Leaks detected in {repo} ({branch}) - See {report_path}")
@@ -54,7 +54,6 @@ def scan_repo(project, repo, rules_file):
         else:
             print(f"✅ No leaks found in {repo} ({branch})")
 
-        # Cleanup repo after scan
         subprocess.run(["rm", "-rf", repo_dir], check=False)
 
 # Function to get all branches of a repo
@@ -91,7 +90,7 @@ def parse_gitleaks_report(report_path, project, repo, branch):
                 leak.get("RuleID", ""),
                 leak.get("File", ""),
                 leak.get("Match", ""),
-                leak.get("StartLine", ""),  # Adding line number
+                leak.get("StartLine", ""),  
                 leak.get("Secret", ""),
                 leak.get("Fingerprint", "")
             ])
@@ -101,12 +100,17 @@ with open(OUTPUT_CSV, "w", newline="") as csvfile:
     writer = csv.writer(csvfile)
     writer.writerow(["Project", "Repo", "Branch", "RuleID", "File", "Match", "Line Number", "Secret", "Fingerprint"])
 
-# Read input CSV and scan all projects/repos
-with open(args.csv, "r") as csvfile:
-    reader = csv.reader(csvfile)
-    next(reader)  # Skip header
-    for row in reader:
-        project, repo = row
-        scan_repo(project, repo, args.rules)
+# Process each CSV file
+for csv_file in csv_files:
+    if not os.path.exists(csv_file):
+        print(f"⚠️ CSV file not found: {csv_file}")
+        continue
+
+    with open(csv_file, "r") as csvfile:
+        reader = csv.reader(csvfile)
+        next(reader)  # Skip header
+        for row in reader:
+            project, repo = row
+            scan_repo(project, repo, args.rules)
 
 print(f"✅ Consolidated report saved as {OUTPUT_CSV}")
