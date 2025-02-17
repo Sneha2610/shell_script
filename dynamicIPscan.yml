@@ -1,24 +1,19 @@
-trigger:
-- none  # Change if needed
+trigger: none
 
 parameters:
   - name: rules_file
     displayName: "Select Rules File"
     type: string
-    default: "rules1.toml"
+    default: "Gitleaks/rules1.toml"
     values:
-      - "rules1.toml"
-      - "rules2.toml"
-      - "rules3.toml"
+      - "Gitleaks/rulesDNS1.toml"
+      - "Gitleaks/rules1.toml"
+      - "Gitleaks/rulesDNS3.toml"
 
-  - name: csv_file
-    displayName: "Select Project CSV File"
+  - name: csv_files
+    displayName: "Enter Project CSV Files (comma-separated)"
     type: string
-    default: "projects1_repos.csv"
-    values:
-      - "projects1_repos.csv"
-      - "projects2_repos.csv"
-      - "projects3_repos.csv"
+    default: "data/14147_Repo1.csv,data/14147_Repo2.csv"
 
 jobs:
 - job: GitleaksScan
@@ -30,5 +25,5 @@ jobs:
   - checkout: self
 
   - script: |
-      python scan_repos.py --rules ${{ parameters.rules_file }} --csv ${{ parameters.csv_file }}
-    displayName: "Run Gitleaks with dynamic rules and projects"
+      python scan_repos.py --rules ${{ parameters.rules_file }} --csv "${{ parameters.csv_files }}"
+    displayName: "Run Gitleaks with dynamic rules and multiple project CSVs"
