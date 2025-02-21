@@ -27,19 +27,27 @@ def extract_zip(zip_file, extract_to):
     with zipfile.ZipFile(zip_file, 'r') as zip_ref:
         zip_ref.extractall(extract_to)
 
-def run_cloc(repo_dir, repo_name):
-    """Runs cloc.pl on the extracted repository."""
-    cloc_command = f"perl cloc.pl {repo_dir} --out={repo_name}-cloc-report.txt"
+def run_cloc(project, repo_dir, repo_name):
+    """Runs cloc.pl on the extracted repository and saves output in CSV format."""
+    report_folder = os.path.join("cloc_reports", project)
+    os.makedirs(report_folder, exist_ok=True)
+    report_path = os.path.join(report_folder, f"{repo_name}_cloc.csv")
+    cloc_command = f"perl cloc.pl {repo_dir} --csv --out={report_path}"
     result = subprocess.run(cloc_command, shell=True)
-    return result.returncode == 0
+    return result.returncode == 0, report_path
 
-def publish_artifact(repo_name):
-    """Publishes the CLOC report as an artifact in Azure DevOps."""
-    artifact_file = f"{repo_name}-cloc-report.txt"
-    if os.path.exists(artifact_file):
-        print(f"##vso[artifact.upload containerfolder={repo_name};artifactname={repo_name}-cloc-report]{artifact_file}")
-    else:
-        print(f"Artifact file {artifact_file} not found.")
+def publish_artifact(report_path, project, repo_name):
+    """Moves the artifact to a staging directory for Azure DevOps to publish."""
+    artifact_staging_dir = os.environ.get("BUILD_ARTIFACTSTAGINGDIRECTORY", "artifact_staging")
+    destination_folder = os.path.join(artifact_staging_dir, project)
+    os.makedirs(destination_folder, exist_ok=True)
+    destination_path = os.path.join(destination_folder, f"{repo_name}_cloc.csv")
+
+    try:
+        os.rename(report_path, destination_path)
+        print(f"Artifact moved to: {destination_path}")
+    except Exception as e:
+        print(f"Failed to move artifact for {repo_name}: {e}")
 
 def main():
     # Assuming cloc.pl is available in the repo
@@ -76,9 +84,10 @@ def main():
                 extract_zip(zip_file, extract_folder)
 
                 print(f"Running CLOC on {repo_name}")
-                if run_cloc(extract_folder, repo_name):
+                success, report_path = run_cloc(project, extract_folder, repo_name)
+                if success:
                     print(f"Publishing artifact for {repo_name}")
-                    publish_artifact(repo_name)
+                    publish_artifact(report_path, project, repo_name)
                 else:
                     print(f"Failed to run CLOC for {repo_name}")
 
