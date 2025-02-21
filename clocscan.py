@@ -7,6 +7,7 @@ import sys
 ADO_ORG_URL = "https://dev.azure.com/yourorganization/"  # Replace with your actual organization URL
 ADO_TOKEN = os.environ.get("TOKEN")  # Personal Access Token from pipeline
 CSV_FILE = "projectandrepos.csv"  # CSV containing Project Name and Repository Name columns
+REPORTS_DIR = "Reports"  # Base directory for reports
 
 def validate_cloc_path(cloc_path):
     """Validates if the given cloc.pl path exists."""
@@ -22,9 +23,13 @@ def clone_repository(project, repo_name):
     result = subprocess.run(clone_cmd, shell=True)
     return result.returncode == 0
 
-def run_cloc(cloc_path, repo_name):
-    """Runs cloc.pl on the cloned repository and generates a CSV report."""
-    output_file = f"{repo_name}.csv"
+def run_cloc(cloc_path, project, repo_name):
+    """Runs cloc.pl on the cloned repository and generates a CSV report in the Reports/{project}/{repo}.csv path."""
+    # Create project-specific directory
+    project_report_dir = os.path.join(REPORTS_DIR, project)
+    os.makedirs(project_report_dir, exist_ok=True)
+
+    output_file = os.path.join(project_report_dir, f"{repo_name}.csv")
     cloc_cmd = f"perl {cloc_path} {repo_name} --csv --out={output_file}"
     print(f"Running cloc.pl on '{repo_name}' (output: {output_file})...")
     result = subprocess.run(cloc_cmd, shell=True)
@@ -66,7 +71,7 @@ def main(cloc_path):
 
             print(f"\n--- Processing repository '{repo_name}' from project '{project}' ---")
             if clone_repository(project, repo_name):
-                success, report_path = run_cloc(cloc_path, repo_name)
+                success, report_path = run_cloc(cloc_path, project, repo_name)
                 if success:
                     publish_artifact(report_path, project, repo_name)
                 else:
