@@ -35,8 +35,11 @@ def run_cloc(repo_dir, repo_name):
 
 def publish_artifact(repo_name):
     """Publishes the CLOC report as an artifact in Azure DevOps."""
-    artifact_command = f"echo '##vso[artifact.upload containerfolder={repo_name};artifactname={repo_name}-cloc-report]{repo_name}-cloc-report.txt'"
-    subprocess.run(artifact_command, shell=True)
+    artifact_file = f"{repo_name}-cloc-report.txt"
+    if os.path.exists(artifact_file):
+        print(f"##vso[artifact.upload containerfolder={repo_name};artifactname={repo_name}-cloc-report]{artifact_file}")
+    else:
+        print(f"Artifact file {artifact_file} not found.")
 
 def main():
     # Assuming cloc.pl is available in the repo
