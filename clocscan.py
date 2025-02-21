@@ -1,107 +1,109 @@
 import os
-import requests
-import zipfile
 import subprocess
+import requests
 
 # Hardcoded Azure DevOps configuration
 ADO_ORG_URL = "https://dev.azure.com/yourorganization/"  # Replace with your actual organization URL
 ADO_TOKEN = os.environ.get("TOKEN")  # Personal Access Token (set in the pipeline)
-PROJECTS_FILE = "projects.txt"         # Contains one project name per line
+PROJECTS_FILE = "projects.txt"         # File with one project name per line
 AUTH = ('', ADO_TOKEN)
 
-def download_repo_zip(project, repo_name):
-    """
-    Downloads a repository as a ZIP archive from Azure DevOps.
-    This avoids performing a full git clone.
-    """
-    url = f"{ADO_ORG_URL}{project}/_apis/git/repositories/{repo_name}/items?scopePath=/&$format=zip&download=true&api-version=6.0"
+def list_repositories(project):
+    """Lists all repositories in the given project using the Azure DevOps REST API."""
+    url = f"{ADO_ORG_URL}{project}/_apis/git/repositories?api-version=6.0"
     response = requests.get(url, auth=AUTH)
     if response.status_code == 200:
-        zip_file = f"{repo_name}.zip"
-        with open(zip_file, "wb") as f:
-            f.write(response.content)
-        return zip_file
+        repos = response.json().get("value", [])
+        print(f"Found {len(repos)} repositories in project {project}.")
+        return repos
     else:
-        print(f"Failed to download {repo_name}: {response.status_code} - {response.text}")
-        return None
+        print(f"Failed to list repositories for project {project}: {response.status_code} - {response.text}")
+        return []
 
-def extract_zip(zip_file, extract_to):
-    """Extracts the downloaded ZIP file."""
-    with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-        zip_ref.extractall(extract_to)
+def clone_repository(project, repo_name):
+    """
+    Clones the specified repository.
+    Note: Replace 'yourorganization' with your actual organization name if needed.
+    """
+    # Construct the clone URL with PAT in it
+    clone_url = f"https://{ADO_TOKEN}@dev.azure.com/yourorganization/{project}/_git/{repo_name}"
+    clone_cmd = f"git clone {clone_url}"
+    print(f"Cloning repository '{repo_name}' from project '{project}'...")
+    result = subprocess.run(clone_cmd, shell=True)
+    return result.returncode == 0
 
-def run_cloc(project, repo_dir, repo_name):
+def run_cloc(repo_name):
     """
-    Runs cloc.pl on the extracted repository and saves output in CSV format.
-    The CSV report will be stored in the folder structure:
-      cloc_reports/<project>/<repo_name>_cloc.csv
+    Runs cloc.pl on the cloned repository directory and generates a CSV report.
+    The report is saved as <repo_name>.csv in a folder structure: cloc_reports/<project>/.
     """
-    report_folder = os.path.join("cloc_reports", project)
-    os.makedirs(report_folder, exist_ok=True)
-    report_path = os.path.join(report_folder, f"{repo_name}_cloc.csv")
-    cloc_command = f"perl cloc.pl {repo_dir} --csv --out={report_path}"
-    print(f"Executing: {cloc_command}")
-    result = subprocess.run(cloc_command, shell=True)
-    return result.returncode == 0, report_path
+    output_file = f"{repo_name}.csv"
+    cloc_cmd = f"perl cloc.pl {repo_name} --csv --out={output_file}"
+    print(f"Running cloc.pl on '{repo_name}' (output: {output_file})...")
+    result = subprocess.run(cloc_cmd, shell=True)
+    return (result.returncode == 0, output_file)
 
 def publish_artifact(report_path, project, repo_name):
     """
-    Publishes the CSV report as an artifact using the Azure DevOps logging command.
-    The logging command printed to STDOUT is picked up by the build agent.
+    Publishes the CSV report as a pipeline artifact using the Azure DevOps logging command.
+    The logging command printed to STDOUT is detected by the build agent.
     """
     if os.path.exists(report_path):
         abs_path = os.path.abspath(report_path)
-        # The artifact name here is formed as "<project>/<repo_name>_cloc"
+        # The artifact name is set as "<project>/<repo_name>_cloc"
         print(f"##vso[artifact.upload artifactname={project}/{repo_name}_cloc]{abs_path}")
-        print(f"Published artifact for repository: {repo_name}")
+        print(f"Published artifact for repository '{repo_name}' from project '{project}'.")
     else:
-        print(f"Artifact file {report_path} not found.")
+        print(f"Artifact file {report_path} not found for repository '{repo_name}'.")
+
+def cleanup_repository(repo_name):
+    """Deletes the cloned repository folder."""
+    cleanup_cmd = f"rm -rf {repo_name}"
+    print(f"Cleaning up repository folder '{repo_name}'...")
+    subprocess.run(cleanup_cmd, shell=True)
 
 def main():
-    # Ensure cloc.pl exists in the repository (it should be committed to your repo)
+    # Ensure cloc.pl exists in the repo
     if not os.path.exists("cloc.pl"):
-        print("cloc.pl not found in the repository. Please ensure it is available and executable.")
+        print("cloc.pl not found. Please ensure cloc.pl is available and executable in the repository.")
         return
 
-    # Read project names from file (each line should contain one project name)
+    # Read project names from the file
     if not os.path.exists(PROJECTS_FILE):
-        print("Projects file not found.")
+        print(f"{PROJECTS_FILE} not found. Please create a file with one project name per line.")
         return
 
-    with open(PROJECTS_FILE, "r") as file:
-        projects = [line.strip() for line in file if line.strip()]
+    with open(PROJECTS_FILE, "r") as f:
+        projects = [line.strip() for line in f if line.strip()]
 
-    # Process each project in the file
+    if not projects:
+        print("No projects found in the file.")
+        return
+
+    # Process each project
     for project in projects:
-        print(f"Processing project: {project}")
-        url = f"{ADO_ORG_URL}{project}/_apis/git/repositories?api-version=6.0"
-        response = requests.get(url, auth=AUTH)
-
-        if response.status_code != 200:
-            print(f"Failed to fetch repositories for {project}. Error: {response.status_code} - {response.text}")
+        print(f"\n=== Processing project: {project} ===")
+        repos = list_repositories(project)
+        if not repos:
+            print(f"No repositories found for project '{project}'.")
             continue
 
-        repos = response.json().get("value", [])
-
+        # Process each repository in the project
         for repo in repos:
-            repo_name = repo["name"]
-            print(f"Downloading repository: {repo_name}")
-            zip_file = download_repo_zip(project, repo_name)
-            if zip_file:
-                extract_folder = f"./{repo_name}"
-                extract_zip(zip_file, extract_folder)
+            repo_name = repo.get("name")
+            if not repo_name:
+                continue
 
-                print(f"Running CLOC on {repo_name}")
-                success, report_path = run_cloc(project, extract_folder, repo_name)
+            print(f"\n--- Processing repository: {repo_name} ---")
+            if clone_repository(project, repo_name):
+                success, report_path = run_cloc(repo_name)
                 if success:
-                    print(f"Publishing artifact for {repo_name}")
                     publish_artifact(report_path, project, repo_name)
                 else:
-                    print(f"Failed to run CLOC for {repo_name}")
-
-                # Cleanup: Remove the ZIP file and extracted folder
-                os.remove(zip_file)
-                subprocess.run(f"rm -rf {extract_folder}", shell=True)
+                    print(f"Failed to run cloc.pl for repository '{repo_name}'.")
+                cleanup_repository(repo_name)
+            else:
+                print(f"Failed to clone repository '{repo_name}'.")
 
 if __name__ == "__main__":
     main()
