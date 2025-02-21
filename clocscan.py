@@ -19,7 +19,7 @@ def download_repo_zip(project, repo_name):
             f.write(response.content)
         return zip_file
     else:
-        print(f"Failed to download {repo_name}: {response.status_code}")
+        print(f"Failed to download {repo_name}: {response.status_code} - {response.text}")
         return None
 
 def extract_zip(zip_file, extract_to):
@@ -58,7 +58,7 @@ def main():
         response = requests.get(url, auth=AUTH)
 
         if response.status_code != 200:
-            print(f"Failed to fetch repositories for {project}")
+            print(f"Failed to fetch repositories for {project}. Error: {response.status_code} - {response.text}")
             continue
 
         repos = response.json().get("value", [])
@@ -73,4 +73,15 @@ def main():
                 extract_zip(zip_file, extract_folder)
 
                 print(f"Running CLOC on {repo_name}")
-                if run_cloc
+                if run_cloc(extract_folder, repo_name):
+                    print(f"Publishing artifact for {repo_name}")
+                    publish_artifact(repo_name)
+                else:
+                    print(f"Failed to run CLOC for {repo_name}")
+
+                # Cleanup extracted files and zip
+                os.remove(zip_file)
+                subprocess.run(f"rm -rf {extract_folder}", shell=True)
+
+if __name__ == "__main__":
+    main()
