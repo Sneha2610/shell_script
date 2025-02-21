@@ -3,8 +3,8 @@ import requests
 import zipfile
 import subprocess
 
-# Azure DevOps configuration
-ADO_ORG_URL = os.environ.get("ADO_ORG_URL")  # Example: https://dev.azure.com/yourorganization/
+# Hardcoded Azure DevOps configuration
+ADO_ORG_URL = "https://dev.azure.com/yourorganization/"  # Replace with your actual organization URL
 ADO_TOKEN = os.environ.get("TOKEN")  # Personal Access Token (set in pipeline)
 PROJECTS_FILE = "projects.txt"
 AUTH = ('', ADO_TOKEN)
@@ -39,10 +39,10 @@ def publish_artifact(repo_name):
     subprocess.run(artifact_command, shell=True)
 
 def main():
-    # Check if cloc.pl exists
+    # Assuming cloc.pl is available in the repo
     if not os.path.exists("cloc.pl"):
-        subprocess.run("curl -O https://raw.githubusercontent.com/AlDanial/cloc/master/cloc.pl", shell=True)
-        subprocess.run("chmod +x cloc.pl", shell=True)
+        print("cloc.pl not found in the repository.")
+        return
 
     # Read projects from file
     if not os.path.exists(PROJECTS_FILE):
