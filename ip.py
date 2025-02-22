@@ -10,68 +10,56 @@ if not TOKEN:
 # Azure DevOps configurations
 ADO_ORG = "your_organization"  # Replace with your Azure DevOps organization
 API_VERSION = "7.1-preview.1"
-BASE_URL = f"https://dev.azure.com/{ADO_ORG}"
+BASE_URL = f"https://almsearch.dev.azure.com/{ADO_ORG}/_apis/search/codesearchresults?api-version={API_VERSION}"
 
-# Prepare authorization headers without base64 encoding
+# Prepare authorization headers using Bearer token directly
 HEADERS = {
     'Content-Type': 'application/json',
-    'Authorization': f'Basic :{TOKEN}'  # Directly using the PAT
+    'Authorization': f'Bearer {TOKEN}'  # Direct token usage
 }
 
 # Load IP list from a file
-ip_file = "ips.txt"  # Replace with your actual file path
+ip_file = "ips.txt"
 with open(ip_file, 'r') as file:
-    ip_list = [line.strip() for line in file.readlines() if line.strip()]
+    ip_list = [line.strip() for line in file if line.strip()]
 
-# Function to search for an IP in a repo using Azure DevOps Code Search API
-def search_ip_in_repo(project, repo, ip):
-    url = f"{BASE_URL}/{project}/_apis/search/codesearchresults?api-version={API_VERSION}"
-    payload = {
-        "searchText": ip,
-        "filters": {
-            "Repository": [repo]
-        }
-    }
-
-    response = requests.post(url, json=payload, headers=HEADERS)
+# Function to search for an IP across the organization
+def search_ip(ip):
+    url = f"{BASE_URL}&searchText={ip}"
+    
+    response = requests.get(url, headers=HEADERS)
     if response.status_code == 200:
         return response.json()
     else:
-        print(f"Error searching in {project}/{repo}: {response.status_code}")
-        print("Response Text:", response.text)  # Debugging HTML responses
+        print(f"Error searching for IP {ip}: {response.status_code}")
+        print("Response Text:", response.text[:500])  # Debug first 500 chars of response
         return None
 
-# Load list of projects and repositories from CSV
-repo_csv = "repos.csv"  # Replace with your actual CSV file path
-df_repos = pd.read_csv(repo_csv)
-
-# Prepare results list
+# Collect results
 results = []
 
-# Iterate through all IPs and repositories
-for _, row in df_repos.iterrows():
-    project = row['Project Name']
-    repo = row['Repository Name']
+# Iterate through all IPs and search across the organization
+for ip in ip_list:
+    search_results = search_ip(ip)
+    if search_results and "results" in search_results:
+        for result in search_results["results"]:
+            project_name = result.get("project", {}).get("name", "Unknown")
+            repo_name = result.get("repository", {}).get("name", "Unknown")
+            file_path = result.get("path", "Unknown")
+            for match in result.get("matches", []):
+                line_number = match.get("line", "Unknown")
+                results.append({
+                    "IP Found": ip,
+                    "Project": project_name,
+                    "Repository": repo_name,
+                    "File Path": file_path,
+                    "Line Number": line_number
+                })
 
-    for ip in ip_list:
-        search_results = search_ip_in_repo(project, repo, ip)
-        if search_results and "results" in search_results:
-            for result in search_results["results"]:
-                file_path = result.get("path", "Unknown")
-                for match in result.get("matches", []):
-                    line_number = match.get("line", "Unknown")
-                    results.append({
-                        "Project": project,
-                        "Repository": repo,
-                        "File": file_path,
-                        "Line Number": line_number,
-                        "IP Found": ip
-                    })
-
-# Convert results to DataFrame and export as CSV
+# Export results to CSV
 if results:
     results_df = pd.DataFrame(results)
-    results_df.to_csv("ip_search_report.csv", index=False)
-    print("Report generated: ip_search_report.csv")
+    results_df.to_csv("org_ip_search_report.csv", index=False)
+    print("Report generated: org_ip_search_report.csv")
 else:
-    print("No IPs found in any repositories.")
+    print("No IPs found across the organization.")
