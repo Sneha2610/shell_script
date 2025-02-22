@@ -30,7 +30,8 @@ with open(ip_file, 'r') as file:
 # Function to search for an IP across the organization using POST
 def search_ip(ip):
     payload = {
-        "searchText": ip
+        "searchText": ip,
+        "$top": 1000  # Return up to 1000 results per query
     }
     
     response = requests.post(BASE_URL, headers=HEADERS, json=payload)
