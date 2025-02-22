@@ -23,11 +23,13 @@ ip_file = "ips.txt"
 with open(ip_file, 'r') as file:
     ip_list = [line.strip() for line in file if line.strip()]
 
-# Function to search for an IP across the organization
+# Function to search for an IP across the organization using POST
 def search_ip(ip):
-    url = f"{BASE_URL}&searchText={ip}"
+    payload = {
+        "searchText": ip
+    }
     
-    response = requests.get(url, headers=HEADERS)
+    response = requests.post(BASE_URL, headers=HEADERS, json=payload)
     if response.status_code == 200:
         return response.json()
     else:
