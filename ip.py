@@ -1,4 +1,5 @@
 import os
+import base64
 import requests
 import pandas as pd
 
@@ -7,15 +8,18 @@ TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     raise ValueError("TOKEN environment variable not set!")
 
+# Encode token for Basic Authentication
+basic_token = base64.b64encode(f":{TOKEN}".encode()).decode()
+
 # Azure DevOps configurations
 ADO_ORG = "your_organization"  # Replace with your Azure DevOps organization
-API_VERSION = "7.1-preview.1"
+API_VERSION = "7.1"
 BASE_URL = f"https://almsearch.dev.azure.com/{ADO_ORG}/_apis/search/codesearchresults?api-version={API_VERSION}"
 
-# Prepare authorization headers using Bearer token directly
+# Prepare authorization headers using Basic Auth
 HEADERS = {
     'Content-Type': 'application/json',
-    'Authorization': f'Bearer {TOKEN}'  # Direct token usage
+    'Authorization': f'Basic {basic_token}'
 }
 
 # Load IP list from a file
