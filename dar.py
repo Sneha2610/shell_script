@@ -13,16 +13,19 @@ def process_gitleaks_csv(csv_file):
     repo_name = os.path.basename(csv_file).replace("_gitleaks.csv", "")  # Extract repo name
 
     try:
-        # Read CSV with space handling
-        df = pd.read_csv(csv_file, encoding="utf-8", skipinitialspace=True)  
-        print(f"Processing {csv_file} - Found columns: {list(df.columns)}")  # Debugging line
+        # Read CSV with error handling
+        df = pd.read_csv(csv_file, encoding="utf-8", skipinitialspace=True)
+        
+        print(f"\nProcessing: {csv_file}")
+        print(f"Found columns (before processing): {list(df.columns)}")  # Debugging
 
         # Normalize column names (strip spaces, lowercase)
         df.columns = df.columns.str.strip().str.lower()
+        print(f"Normalized columns (after processing): {list(df.columns)}")  # Debugging
 
-        required_columns = {"line", "linenumber", "file"}  # Ensure lowercase match
+        required_columns = {"line", "linenumber", "file"}
         if not required_columns.issubset(df.columns):
-            print(f"Skipping {csv_file} - Missing required columns.")
+            print(f"Skipping {csv_file} - Missing required columns: {required_columns - set(df.columns)}")
             return []
 
         incident_data = []
@@ -58,6 +61,6 @@ for filename in os.listdir(csv_folder):
 if all_incidents:
     df = pd.DataFrame(all_incidents)
     df.to_csv(output_csv, index=False)
-    print(f"Consolidated CSV Generated: {output_csv}")
+    print(f"\n✅ Consolidated CSV Generated: {output_csv}")
 else:
-    print("No valid data extracted from CSV reports.")
+    print("\n⚠️ No valid data extracted from CSV reports.")
