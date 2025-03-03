@@ -11,34 +11,41 @@ PROJECT_NAME = "Your Project Name"
 def process_gitleaks_csv(csv_file):
     """Extracts data from a single Gitleaks CSV report."""
     repo_name = os.path.basename(csv_file).replace("_gitleaks.csv", "")  # Extract repo name
-    
-    # Read Gitleaks CSV
-    df = pd.read_csv(csv_file)
 
-    # Check if required columns exist
-    required_columns = {"Line", "LineNumber", "File"}  # Adjust based on actual CSV structure
-    if not required_columns.issubset(df.columns):
-        print(f"Skipping {csv_file} - Missing required columns.")
+    try:
+        # Read CSV with space handling
+        df = pd.read_csv(csv_file, encoding="utf-8", skipinitialspace=True)  
+        print(f"Processing {csv_file} - Found columns: {list(df.columns)}")  # Debugging line
+
+        # Normalize column names (strip spaces, lowercase)
+        df.columns = df.columns.str.strip().str.lower()
+
+        required_columns = {"line", "linenumber", "file"}  # Ensure lowercase match
+        if not required_columns.issubset(df.columns):
+            print(f"Skipping {csv_file} - Missing required columns.")
+            return []
+
+        incident_data = []
+        for _, row in df.iterrows():
+            secret_line = row["line"]
+            line_number = row["linenumber"]
+            file_path = row["file"]
+
+            incident_data.append({
+                "Incident Message": "Please ensure you rotate the credentials and update them",
+                "Project Name": PROJECT_NAME,
+                "Repository Name": repo_name,
+                "Variables/Secrets to Remediate": secret_line,
+                "Line Number": line_number,
+                "File Path": file_path,
+                "Remediation Guide": "Link"
+            })
+
+        return incident_data
+
+    except Exception as e:
+        print(f"Error processing {csv_file}: {e}")
         return []
-
-    incident_data = []
-    
-    for _, row in df.iterrows():
-        secret_line = row["Line"]  # Extract leaked secret
-        line_number = row["LineNumber"]  # Extract line number
-        file_path = row["File"]  # Extract file path
-
-        incident_data.append({
-            "Incident Message": "Please ensure you rotate the credentials and update them",
-            "Project Name": PROJECT_NAME,
-            "Repository Name": repo_name,
-            "Variables/Secrets to Remediate": secret_line,
-            "Line Number": line_number,
-            "File Path": file_path,
-            "Remediation Guide": "Link"
-        })
-
-    return incident_data
 
 # Process all CSV reports in the folder
 all_incidents = []
