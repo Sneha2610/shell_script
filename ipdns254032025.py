@@ -39,38 +39,27 @@ def search_in_repositories(term, project):
     repos = get_repositories(project)
 
     for repo in repos:
-        # Search in file paths
         url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/git/repositories/{repo}/items?recursionLevel=full&api-version=7.0"
         response = requests.get(url, headers=HEADERS).json()
         for item in response.get("value", []):
             if "path" in item and term in item["path"]:
                 results.append(f"{project}/{repo} -> {item['path']}")
 
-        # Search inside file contents (latest commit)
-        url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/git/repositories/{repo}/commits?api-version=7.0"
-        commits = requests.get(url, headers=HEADERS).json()
-        for commit in commits.get("value", []):
-            commit_id = commit["commitId"]
-            blob_url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/git/repositories/{repo}/blobs?api-version=7.0&commitId={commit_id}"
-            blob_response = requests.get(blob_url, headers=HEADERS).json()
-            if any(term in blob["content"] for blob in blob_response.get("value", [])):
-                results.append(f"{project}/{repo} -> Found in file content")
-
     return results
 
-# Search in all pipeline logs
+# Search in pipelines logs
 def search_in_pipelines(term, project):
     url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/build/builds?api-version=7.0"
     builds = requests.get(url, headers=HEADERS).json()
     
     results = []
     for build in builds.get("value", []):
-        build_id = build["id"]
+        build_id = str(build["id"])  # Ensure ID is string
         log_url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/build/builds/{build_id}/logs?api-version=7.0"
         logs = requests.get(log_url, headers=HEADERS).json()
         
         for log in logs.get("value", []):
-            log_id = log["id"]
+            log_id = str(log["id"])  # Ensure ID is string
             log_content_url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/build/builds/{build_id}/logs/{log_id}?api-version=7.0"
             log_content = requests.get(log_content_url, headers=HEADERS).text
             if term in log_content:
@@ -78,7 +67,7 @@ def search_in_pipelines(term, project):
 
     return results
 
-# Search in all work items (Titles & Descriptions)
+# Search in work items (Titles & Descriptions)
 def search_in_work_items(term, project):
     url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/wit/wiql?api-version=7.0"
     query = {"query": f"SELECT [System.Id], [System.Title] FROM WorkItems WHERE [System.Title] CONTAINS '{term}' OR [System.Description] CONTAINS '{term}'"}
@@ -86,7 +75,8 @@ def search_in_work_items(term, project):
     
     results = []
     for work_item in response.get("workItems", []):
-        results.append(f"{project} -> Work Item #{work_item['id']}")
+        work_item_id = str(work_item['id'])  # Ensure ID is string
+        results.append(f"{project} -> Work Item #{work_item_id}")
     
     return results
 
