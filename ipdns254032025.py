@@ -1,10 +1,14 @@
 import requests
 import base64
 import csv
+import os
 
 # Azure DevOps Configuration
 ADO_ORG = "your-org-name"
-ADO_PAT = "your-pat-token"
+ADO_PAT = os.getenv("ADO_PAT")  # Read PAT from environment variable
+
+if not ADO_PAT:
+    raise ValueError("Personal Access Token (ADO_PAT) is not set in environment variables.")
 
 # Headers for authentication
 HEADERS = {
@@ -29,7 +33,7 @@ def get_repositories(project):
     response = requests.get(url, headers=HEADERS).json()
     return [repo["name"] for repo in response.get("value", [])]
 
-# Search for a term in repositories (file paths & contents)
+# Search in repositories (file paths & contents)
 def search_in_repositories(term, project):
     results = []
     repos = get_repositories(project)
@@ -47,14 +51,14 @@ def search_in_repositories(term, project):
         commits = requests.get(url, headers=HEADERS).json()
         for commit in commits.get("value", []):
             commit_id = commit["commitId"]
-            url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/git/repositories/{repo}/blobs?api-version=7.0&commitId={commit_id}"
-            blob_response = requests.get(url, headers=HEADERS).json()
+            blob_url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/git/repositories/{repo}/blobs?api-version=7.0&commitId={commit_id}"
+            blob_response = requests.get(blob_url, headers=HEADERS).json()
             if any(term in blob["content"] for blob in blob_response.get("value", [])):
                 results.append(f"{project}/{repo} -> Found in file content")
 
     return results
 
-# Search for a term in all pipeline logs
+# Search in all pipeline logs
 def search_in_pipelines(term, project):
     url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/build/builds?api-version=7.0"
     builds = requests.get(url, headers=HEADERS).json()
@@ -74,7 +78,7 @@ def search_in_pipelines(term, project):
 
     return results
 
-# Search for a term in all work items (Titles & Descriptions)
+# Search in all work items (Titles & Descriptions)
 def search_in_work_items(term, project):
     url = f"https://dev.azure.com/{ADO_ORG}/{project}/_apis/wit/wiql?api-version=7.0"
     query = {"query": f"SELECT [System.Id], [System.Title] FROM WorkItems WHERE [System.Title] CONTAINS '{term}' OR [System.Description] CONTAINS '{term}'"}
@@ -89,4 +93,28 @@ def search_in_work_items(term, project):
 # Scan all projects, write results row-by-row
 def scan_and_write_results(input_file, output_file):
     search_terms = load_search_terms(input_file)
-    projects =
+    projects = get_projects()
+
+    with open(output_file, "w", newline="") as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow(["IP/DNS", "Found In"])
+
+        for term in search_terms:
+            found_locations = []
+
+            for project in projects:
+                found_locations.extend(search_in_repositories(term, project))
+                found_locations.extend(search_in_pipelines(term, project))
+                found_locations.extend(search_in_work_items(term, project))
+
+            if found_locations:
+                csv_writer.writerow([term, "; ".join(found_locations)])
+            else:
+                csv_writer.writerow([term, "Not Found"])
+
+# Run the scan
+input_file = "ips_dns.txt"  # File containing list of IPs/DNS
+output_file = "search_results.csv"
+
+scan_and_write_results(input_file, output_file)
+print(f"Scan completed! Results saved in {output_file}")
