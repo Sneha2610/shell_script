@@ -49,29 +49,22 @@ if "results" not in results:
     print(f"Unexpected API response structure: {results}")
     exit(1)
 
-# Debug: Print each item in "results"
-print("\n🔍 Debugging: Printing each item in 'results'...\n")
-for i, item in enumerate(results.get("results", [])):
-    print(f"Item {i+1}: {item}\n")
-
-# Write results to CSV
+# Write results to CSV (order: Project, Repository, File, Path)
 csv_filename = "ado_search_results.csv"
 with open(csv_filename, mode="w", newline="", encoding="utf-8") as file:
     writer = csv.writer(file)
-    writer.writerow(["Repository", "File Path", "Matched Content"])
+    writer.writerow(["Project", "Repository", "File", "Path"])  # Column headers in correct order
 
     for item in results.get("results", []):
-        if not isinstance(item, dict):  
-            print(f"⚠️ Unexpected item format: {item}")  
-            continue  
+        if not isinstance(item, dict):
+            print(f"⚠️ Unexpected item format: {item}")
+            continue
 
-        repo_name = item.get("repository", {}).get("name", "Unknown Repo")  
-        file_path = item.get("path", "Unknown Path")  
+        project_name = item.get("project", {}).get("name", "Unknown Project")
+        repo_name = item.get("repository", {}).get("name", "Unknown Repo")
+        file_name = item.get("fileName", "Unknown File")
+        file_path = item.get("path", "Unknown Path")
 
-        # Ensure matches exist
-        match_content = item.get("matches", [])
-        matched_text = "\n".join(m.get("fragment", "No Match Found") for m in match_content if isinstance(m, dict))
-
-        writer.writerow([repo_name, file_path, matched_text])
+        writer.writerow([project_name, repo_name, file_name, file_path])  # Correct column order
 
 print(f"✅ Search results saved in {csv_filename}")
