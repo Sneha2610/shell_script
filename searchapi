@@ -1,0 +1,10 @@
+{
+  "searchText": "example",
+  "$top": 100,
+  "$skip": 0
+}
+
+
+
+POST https://dev.azure.com/{organization}/_apis/search/codesearchresults?api-version=7.1-preview.1
+
