@@ -3,6 +3,7 @@ import requests
 import base64
 import csv
 import json
+import time
 
 # Azure DevOps Organization Name
 ORG_NAME = "your-organization"
@@ -12,10 +13,7 @@ PAT = os.getenv("TOKEN")
 if not PAT:
     raise ValueError("PAT is not set. Ensure 'TOKEN' is declared in the ADO pipeline environment.")
 
-# Search Term
-SEARCH_TERM = "your-search-text"
-
-# API URL
+# API URL (Org-wide search)
 API_URL = f"https://almsearch.dev.azure.com/{ORG_NAME}/_apis/search/codesearchresults?api-version=7.1-preview.1"
 
 # Authentication (Base64 encode the PAT)
@@ -27,44 +25,57 @@ headers = {
     "Authorization": f"Basic {auth_header}"
 }
 
-# Request body with $top parameter
-payload = {
-    "searchText": SEARCH_TERM,
-    "$top": 100
-}
+# Input file containing 2000+ search terms (one per line)
+SEARCH_FILE = "search_terms.txt"
 
-# Make API request
-response = requests.post(API_URL, json=payload, headers=headers)
+# Output CSV file
+CSV_FILENAME = "ado_bulk_search_results.csv"
 
-# Check response
-try:
-    results = response.json()
-    print("Full JSON Response:\n", json.dumps(results, indent=4))  # Pretty print JSON
-except requests.exceptions.JSONDecodeError:
-    print(f"Error: API returned non-JSON response: {response.text}")
-    exit(1)
+# Read search terms from file
+with open(SEARCH_FILE, "r", encoding="utf-8") as file:
+    search_terms = [line.strip() for line in file if line.strip()]
 
-# Validate response structure
-if "results" not in results:
-    print(f"Unexpected API response structure: {results}")
-    exit(1)
-
-# Write results to CSV (order: Project, Repository, File, Path)
-csv_filename = "ado_search_results.csv"
-with open(csv_filename, mode="w", newline="", encoding="utf-8") as file:
+# Write results to CSV
+with open(CSV_FILENAME, mode="w", newline="", encoding="utf-8") as file:
     writer = csv.writer(file)
-    writer.writerow(["Project", "Repository", "File", "Path"])  # Column headers in correct order
+    writer.writerow(["Search Term", "Project", "Repository", "File", "Path"])  # Column headers
 
-    for item in results.get("results", []):
-        if not isinstance(item, dict):
-            print(f"⚠️ Unexpected item format: {item}")
+    for term in search_terms:
+        print(f"🔍 Searching for: {term}")
+
+        payload = {
+            "searchText": term,
+            "$top": 100  # Adjust if needed
+        }
+
+        # Make API request
+        response = requests.post(API_URL, json=payload, headers=headers)
+
+        # Handle potential API rate limits
+        if response.status_code == 429:
+            print("⚠️ Rate limit hit. Sleeping for 60 seconds...")
+            time.sleep(60)
             continue
 
-        project_name = item.get("project", {}).get("name", "Unknown Project")
-        repo_name = item.get("repository", {}).get("name", "Unknown Repo")
-        file_name = item.get("fileName", "Unknown File")
-        file_path = item.get("path", "Unknown Path")
+        # Parse JSON response
+        try:
+            results = response.json()
+        except requests.exceptions.JSONDecodeError:
+            print(f"❌ Error decoding JSON for {term}: {response.text}")
+            continue
 
-        writer.writerow([project_name, repo_name, file_name, file_path])  # Correct column order
+        # Validate response structure
+        if "results" not in results:
+            print(f"⚠️ No results found for {term}")
+            continue
 
-print(f"✅ Search results saved in {csv_filename}")
+        # Extract and write results
+        for item in results.get("results", []):
+            project_name = item.get("project", {}).get("name", "Unknown Project")
+            repo_name = item.get("repository", {}).get("name", "Unknown Repo")
+            file_name = item.get("fileName", "Unknown File")
+            file_path = item.get("path", "Unknown Path")
+
+            writer.writerow([term, project_name, repo_name, file_name, file_path])
+
+print(f"✅ All search results saved in {CSV_FILENAME}")
