@@ -1,7 +1,7 @@
 import os
 import requests
 import base64
-import csv
+import json
 
 # Azure DevOps Organization Name
 ORG_NAME = "your-organization"
@@ -35,30 +35,19 @@ payload = {
 # Make API request
 response = requests.post(API_URL, json=payload, headers=headers)
 
+# Print raw response (for debugging)
+print("Raw Response Status Code:", response.status_code)
+print("Raw Response Text:", response.text)
+
 # Check if response is JSON before parsing
 try:
     results = response.json()
+    print("Parsed JSON Response:", json.dumps(results, indent=4))  # Pretty print JSON
 except requests.exceptions.JSONDecodeError:
     print(f"Error: API returned non-JSON response: {response.text}")
     exit(1)
 
 # Validate response structure
 if "results" not in results:
-    print(f"Unexpected API response: {results}")
+    print(f"Unexpected API response structure: {results}")
     exit(1)
-
-# Write results to CSV
-csv_filename = "ado_search_results.csv"
-with open(csv_filename, mode="w", newline="", encoding="utf-8") as file:
-    writer = csv.writer(file)
-    writer.writerow(["Repository", "File Path", "Matched Content"])
-
-    for item in results.get("results", []):
-        repo_name = item.get("repository", {}).get("name", "Unknown Repo")
-        file_path = item.get("path", "Unknown Path")
-        match_content = item.get("matches", [])
-        matched_text = "\n".join(m.get("fragment", "") for m in match_content)
-
-        writer.writerow([repo_name, file_path, matched_text])
-
-print(f"Search results saved in {csv_filename}")
