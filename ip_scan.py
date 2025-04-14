@@ -5,20 +5,29 @@ import re
 import requests
 import urllib.parse
 
-# === CONFIG ===
-ADO_ORG_URL = "https://dev.azure.com/YOUR_ORG_NAME"  # Replace this!
+# === CONFIGURATION ===
+ADO_ORG_URL = "https://dev.azure.com/YOUR_ORG_NAME"  # <-- 🔁 Replace with your org URL
 PAT = os.getenv("ADO_PAT")
 INPUT_CSV = "input.csv"
 OUTPUT_CSV = "output_ips.csv"
 
+# Check if PAT is set
 if not PAT:
     raise EnvironmentError("ADO_PAT environment variable not set")
 
+# Set request headers
 HEADERS = {
     "Authorization": "Basic " + base64.b64encode(f':{PAT}'.encode()).decode()
 }
 
+# Regex to match IPv4 addresses
 ip_regex = re.compile(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b')
+
+# File extensions considered text/code
+TEXT_EXTENSIONS = ('.yml', '.yaml', '.json', '.py', '.sh', '.conf', '.txt', '.cs', '.js', '.xml', '.ini', '.cfg')
+BINARY_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.pdf', '.zip', '.exe', '.dll', '.jar', '.bin')
+
+# === FUNCTIONS ===
 
 def get_repo_id(project, repo_name):
     encoded_project = urllib.parse.quote(project.strip(), safe='')
@@ -53,6 +62,12 @@ def get_file_content(project, repo_id, path):
         response = requests.get(url, headers=HEADERS, params=params)
         response.raise_for_status()
 
+        # Skip non-text responses
+        content_type = response.headers.get("Content-Type", "")
+        if "html" in content_type or "application/octet-stream" in content_type:
+            print(f"⚠️ Skipping binary or HTML file: {path}")
+            return ""
+
         if not response.content:
             print(f"🚫 No content returned for: {path}")
             return ""
@@ -60,10 +75,11 @@ def get_file_content(project, repo_id, path):
         try:
             json_data = response.json()
         except ValueError:
-            if "<html" in response.text.lower():
-                print(f"⚠️ Received HTML instead of JSON for {path} (possible error page)")
-            else:
-                print(f"⚠️ Invalid JSON for {path}. Raw response: {response.text[:300]}")
+            print(f"\n⚠️ Invalid JSON for: {path}")
+            print(f"🔎 Status code: {response.status_code}")
+            print(f"📄 Raw response (first 500 chars):\n{response.text[:500]}")
+            with open("invalid_response_debug.log", "a", encoding="utf-8") as log_file:
+                log_file.write(f"\n\n[FILE: {path}]\nSTATUS: {response.status_code}\nRESPONSE:\n{response.text}\n{'='*80}")
             return ""
 
         if 'content' not in json_data:
@@ -86,6 +102,8 @@ def get_file_content(project, repo_id, path):
         print(f"⚠️ Unexpected error on {path}: {e}")
         return ""
 
+# === MAIN SCRIPT ===
+
 def main():
     results = []
 
@@ -105,7 +123,9 @@ def main():
                         continue
 
                     file_path = item['path']
-                    if not file_path.endswith(('.yml', '.yaml', '.json', '.py', '.sh', '.conf', '.txt', '.cs', '.js', '.xml')):
+                    if file_path.lower().endswith(BINARY_EXTENSIONS):
+                        continue
+                    if not file_path.lower().endswith(TEXT_EXTENSIONS):
                         continue
 
                     try:
