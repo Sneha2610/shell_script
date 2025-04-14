@@ -6,7 +6,7 @@ import requests
 import urllib.parse
 
 # === CONFIG ===
-ADO_ORG_URL = "https://dev.azure.com/YOUR_ORG_NAME"  # <-- Replace with your ADO org name
+ADO_ORG_URL = "https://dev.azure.com/YOUR_ORG_NAME"  # <-- Replace this with your ADO org name
 PAT = os.getenv("ADO_PAT")
 INPUT_CSV = "input.csv"
 OUTPUT_CSV = "output_ips.csv"
@@ -34,17 +34,42 @@ def get_repo_id(project, repo_name):
     return response.json()['id']
 
 def get_items(project, repo_id):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items?recursionLevel=Full&api-version=7.1-preview.1"
-    response = requests.get(url, headers=HEADERS)
+    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items"
+    params = {
+        "recursionLevel": "Full",
+        "api-version": "7.1-preview.1"
+    }
+    response = requests.get(url, headers=HEADERS, params=params)
     response.raise_for_status()
     return response.json().get('value', [])
 
 def get_file_content(project, repo_id, path):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items?path={urllib.parse.quote(path, safe='')}&api-version=7.1-preview.1&includeContent=true"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200 and 'content' in response.json():
-        return response.json()['content']
-    return ""
+    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items"
+    params = {
+        "path": path,
+        "api-version": "7.1-preview.1",
+        "includeContent": "true"
+    }
+    try:
+        response = requests.get(url, headers=HEADERS, params=params)
+        response.raise_for_status()
+        json_data = response.json()
+
+        if 'content' not in json_data:
+            print(f"🚫 Skipping (no content field): {path}")
+            return ""
+
+        return json_data['content']
+
+    except requests.exceptions.HTTPError as e:
+        if response.status_code == 400 and "too large" in response.text.lower():
+            print(f"🚫 Skipping large file: {path}")
+        else:
+            print(f"❌ HTTP Error on {path}: {response.status_code} - {response.text}")
+        return ""
+    except Exception as e:
+        print(f"⚠️ Unexpected error on {path}: {e}")
+        return ""
 
 def main():
     results = []
@@ -63,21 +88,23 @@ def main():
                 for item in items:
                     if item.get('isFolder', False):
                         continue
-                    if not item['path'].endswith(('.yml', '.yaml', '.json', '.py', '.sh', '.conf', '.txt', '.cs', '.js')):
+
+                    file_path = item['path']
+                    if not file_path.endswith(('.yml', '.yaml', '.json', '.py', '.sh', '.conf', '.txt', '.cs', '.js', '.xml')):
                         continue
 
                     try:
-                        content = get_file_content(project, repo_id, item['path'])
+                        content = get_file_content(project, repo_id, file_path)
                         ips = ip_regex.findall(content)
                         for ip in ips:
                             results.append({
                                 'project': project,
                                 'repo': repo_name,
-                                'file': item['path'],
+                                'file': file_path,
                                 'ip': ip
                             })
                     except Exception as e:
-                        print(f"⚠️ Error reading file {item['path']}: {e}")
+                        print(f"⚠️ Error reading file {file_path}: {e}")
 
             except Exception as e:
                 print(f"❌ Error with repo '{repo_name}' in project '{project}': {e}")
