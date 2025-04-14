@@ -52,11 +52,21 @@ def get_file_content(project, repo_id, path):
     }
     try:
         response = requests.get(url, headers=HEADERS, params=params)
-        response.raise_for_status()
-        json_data = response.json()
+        response.raise_for_status()  # Will raise an exception for 4xx/5xx status codes
+        if not response.content:  # If content is empty
+            print(f"🚫 No content returned for file: {path}")
+            return ""
 
+        # Try to parse the response as JSON
+        try:
+            json_data = response.json()
+        except ValueError:
+            print(f"⚠️ Invalid JSON for {path}: {response.text}")
+            return ""
+
+        # Check if 'content' is in the response JSON
         if 'content' not in json_data:
-            print(f"🚫 Skipping (no content field): {path}")
+            print(f"🚫 Skipping (no content field) for file: {path}")
             return ""
 
         return json_data['content']
