@@ -1,157 +1,92 @@
 import os
 import csv
-import base64
 import re
-import requests
-import urllib.parse
+import tempfile
+import subprocess
+from pathlib import Path
+import shutil
 
 # === CONFIGURATION ===
-ADO_ORG_URL = "https://dev.azure.com/YOUR_ORG_NAME"  # <-- 🔁 Replace with your org URL
-PAT = os.getenv("ADO_PAT")
-INPUT_CSV = "input.csv"
-OUTPUT_CSV = "output_ips.csv"
+ADO_ORG = "YOUR_ORG_NAME"  # 🔁 Replace with your Azure DevOps org name
+ADO_PAT = os.getenv("ADO_PAT")
+INPUT_CSV = "repo.csv"
+OUTPUT_CSV = "report.csv"
 
-# Check if PAT is set
-if not PAT:
-    raise EnvironmentError("ADO_PAT environment variable not set")
+if not ADO_PAT:
+    raise EnvironmentError("Set your ADO_PAT environment variable.")
 
-# Set request headers
-HEADERS = {
-    "Authorization": "Basic " + base64.b64encode(f':{PAT}'.encode()).decode()
-}
-
-# Regex to match IPv4 addresses
 ip_regex = re.compile(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b')
-
-# File extensions considered text/code
-TEXT_EXTENSIONS = ('.yml', '.yaml', '.json', '.py', '.sh', '.conf', '.txt', '.cs', '.js', '.xml', '.ini', '.cfg')
-BINARY_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.pdf', '.zip', '.exe', '.dll', '.jar', '.bin')
 
 # === FUNCTIONS ===
 
-def get_repo_id(project, repo_name):
-    encoded_project = urllib.parse.quote(project.strip(), safe='')
-    encoded_repo = urllib.parse.quote(repo_name.strip(), safe='')
-    url = f"{ADO_ORG_URL}/{encoded_project}/_apis/git/repositories/{encoded_repo}?api-version=7.1-preview.1"
-    response = requests.get(url, headers=HEADERS)
-    if not response.ok:
-        print(f"❌ Failed to fetch repo ID for '{repo_name}' in project '{project}'")
-        print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.text[:300]}")
-        response.raise_for_status()
-    return response.json()['id']
+def build_repo_url(project, repo):
+    return f"https://{ADO_ORG}@dev.azure.com/{ADO_ORG}/{project}/_git/{repo}"
 
-def get_items(project, repo_id):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items"
-    params = {
-        "recursionLevel": "Full",
-        "api-version": "7.1-preview.1"
-    }
-    response = requests.get(url, headers=HEADERS, params=params)
-    response.raise_for_status()
-    return response.json().get('value', [])
+def clone_repo(repo_url, clone_dir):
+    auth_url = repo_url.replace("https://", f"https://:{ADO_PAT}@")
+    print(f"🔄 Cloning: {repo_url}")
+    result = subprocess.run(
+        ["git", "clone", "--depth=1", auth_url, clone_dir],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    if result.returncode != 0:
+        print(f"❌ Clone failed: {repo_url}\n{result.stderr}")
+        return False
+    return True
 
-def get_file_content(project, repo_id, path):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items"
-    params = {
-        "path": path,
-        "api-version": "7.1-preview.1",
-        "includeContent": "true"
-    }
-    try:
-        response = requests.get(url, headers=HEADERS, params=params)
-        response.raise_for_status()
+def search_ips(project, repo, repo_path):
+    results = []
+    for root, _, files in os.walk(repo_path):
+        for file in files:
+            path = Path(root) / file
+            try:
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    ips = ip_regex.findall(content)
+                    for ip in ips:
+                        results.append({
+                            "project": project,
+                            "repo": repo,
+                            "file": str(path.relative_to(repo_path)),
+                            "ip": ip
+                        })
+            except Exception as e:
+                print(f"⚠️ Failed to read {path}: {e}")
+    return results
 
-        # Skip non-text responses
-        content_type = response.headers.get("Content-Type", "")
-        if "html" in content_type or "application/octet-stream" in content_type:
-            print(f"⚠️ Skipping binary or HTML file: {path}")
-            return ""
-
-        if not response.content:
-            print(f"🚫 No content returned for: {path}")
-            return ""
-
-        try:
-            json_data = response.json()
-        except ValueError:
-            print(f"\n⚠️ Invalid JSON for: {path}")
-            print(f"🔎 Status code: {response.status_code}")
-            print(f"📄 Raw response (first 500 chars):\n{response.text[:500]}")
-            with open("invalid_response_debug.log", "a", encoding="utf-8") as log_file:
-                log_file.write(f"\n\n[FILE: {path}]\nSTATUS: {response.status_code}\nRESPONSE:\n{response.text}\n{'='*80}")
-            return ""
-
-        if 'content' not in json_data:
-            print(f"⚠️ 'content' field missing in JSON for: {path}")
-            return ""
-
-        return json_data['content']
-
-    except requests.exceptions.HTTPError as e:
-        if response.status_code == 400 and "too large" in response.text.lower():
-            print(f"⚠️ Skipping large file: {path}")
-        elif response.status_code == 403:
-            print(f"🚫 Permission denied for: {path}")
-        elif response.status_code == 404:
-            print(f"🚫 File not found: {path}")
-        else:
-            print(f"❌ HTTP Error {response.status_code} for {path}: {response.text[:300]}")
-        return ""
-    except Exception as e:
-        print(f"⚠️ Unexpected error on {path}: {e}")
-        return ""
+def write_results(results):
+    file_exists = os.path.isfile(OUTPUT_CSV)
+    with open(OUTPUT_CSV, 'a', newline='') as csvfile:
+        fieldnames = ["project", "repo", "file", "ip"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerows(results)
 
 # === MAIN SCRIPT ===
 
 def main():
-    results = []
-
-    with open(INPUT_CSV, newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
+    with open(INPUT_CSV, newline='') as f:
+        reader = csv.DictReader(f)
         for row in reader:
             project = row['project'].strip()
-            repo_name = row['repo'].strip()
-            print(f"\n🔍 Scanning repo '{repo_name}' in project '{project}'")
+            repo = row['repo'].strip()
+            repo_url = build_repo_url(project, repo)
 
-            try:
-                repo_id = get_repo_id(project, repo_name)
-                items = get_items(project, repo_id)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                repo_path = os.path.join(tmpdir, repo)
+                if clone_repo(repo_url, repo_path):
+                    ip_results = search_ips(project, repo, repo_path)
+                    if ip_results:
+                        write_results(ip_results)
+                        print(f"✅ IPs found in {repo}. Logged to {OUTPUT_CSV}")
+                    else:
+                        print(f"✅ No IPs found in {repo}")
+                # Repo is auto-deleted with TemporaryDirectory
 
-                for item in items:
-                    if item.get('isFolder', False):
-                        continue
-
-                    file_path = item['path']
-                    if file_path.lower().endswith(BINARY_EXTENSIONS):
-                        continue
-                    if not file_path.lower().endswith(TEXT_EXTENSIONS):
-                        continue
-
-                    try:
-                        content = get_file_content(project, repo_id, file_path)
-                        ips = ip_regex.findall(content)
-                        for ip in ips:
-                            results.append({
-                                'project': project,
-                                'repo': repo_name,
-                                'file': file_path,
-                                'ip': ip
-                            })
-                    except Exception as e:
-                        print(f"⚠️ Error reading file {file_path}: {e}")
-
-            except Exception as e:
-                print(f"❌ Error with repo '{repo_name}' in project '{project}': {e}")
-
-    # Write output
-    with open(OUTPUT_CSV, 'w', newline='') as csvfile:
-        fieldnames = ['project', 'repo', 'file', 'ip']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(results)
-
-    print(f"\n✅ Scan complete. IPs saved to: {OUTPUT_CSV}")
+    print("\n🚀 Scan complete.")
 
 if __name__ == "__main__":
     main()
