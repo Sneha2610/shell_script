@@ -2,65 +2,68 @@ import csv
 import requests
 import re
 import os
-import base64
 
-# --- Configuration ---
-ADO_ORG = "your-org-name"  # 🔁 Replace this with your actual Azure DevOps organization name
+# ------------------ Config ------------------
+ADO_ORG = "your-org-name"  # 🔁 Replace with your Azure DevOps org name
 API_VERSION = "7.1-preview.1"
-PAT = os.environ.get("ADO_PAT")
+PAT = os.environ.get("ADO_PAT")  # 🔐 Set your PAT as an environment variable
 
-if not PAT:
-    raise ValueError("❌ ADO_PAT environment variable not set")
-
-# Encode PAT for basic auth
-encoded_pat = base64.b64encode(f":{PAT}".encode()).decode()
-headers = {
-    "Content-Type": "application/json",
-    "Authorization": f"Basic {encoded_pat}"
-}
-
-# IPv4 regex
+# Regex for IPv4
 ip_regex = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})\b')
 
-# --- Load repositories from repo.csv ---
-with open('repo.csv', newline='', encoding='utf-8') as f:
-    reader = csv.DictReader(f)
-    repos = [row for row in reader]
+# Auth and headers
+auth = requests.auth.HTTPBasicAuth('', PAT)
+headers = {"Content-Type": "application/json"}
 
-# --- Write to output.csv ---
+# ------------------ Load repo.csv ------------------
+with open('repo.csv', newline='', encoding='utf-8') as csvfile:
+    reader = csv.DictReader(csvfile)
+    repo_list = [row for row in reader]
+
+# ------------------ Output CSV ------------------
 with open('output.csv', mode='w', newline='', encoding='utf-8', errors='replace') as out_file:
-    writer = csv.DictWriter(out_file, fieldnames=['Project', 'Repository', 'File', 'IP Found'])
+    fieldnames = ['Project', 'Repository', 'File', 'IP Found']
+    writer = csv.DictWriter(out_file, fieldnames=fieldnames)
     writer.writeheader()
 
-    for repo_entry in repos:
-        project = repo_entry['project']
-        repo = repo_entry['repository']
-        print(f"🔍 Searching {project}/{repo}")
+    for entry in repo_list:
+        project = entry['project']
+        repo = entry['repository']
+        print(f"\n🔍 Scanning: {project}/{repo}")
 
-        # Prepare search API payload
-        search_url = f"https://almsearch.dev.azure.com/{ADO_ORG}/_apis/search/codesearchresults?api-version={API_VERSION}"
+        # Build URL
+        url = f"https://almsearch.dev.azure.com/{ADO_ORG}/{project}/_apis/search/codesearchresults?api-version={API_VERSION}"
+
+        # Payload to search everything (you can change searchText to specific IP if needed)
         payload = {
-            "searchText": ".",
+            "searchText": ".",  # Search all code
             "filters": {
-                "Project": [project],
                 "Repository": [repo]
             },
-            "$top": 1000
+            "$top": 100
         }
 
         try:
-            response = requests.post(search_url, headers=headers, json=payload)
-            response.raise_for_status()  # Raise error for bad status
+            response = requests.post(url, headers=headers, auth=auth, json=payload)
 
-            data = response.json()
-            if not isinstance(data, dict):
-                print(f"❌ Unexpected response format for {project}/{repo}: not a dict")
-                print(data)
+            print(f"🔎 Status Code: {response.status_code}")
+            print(f"🔎 Content-Type: {response.headers.get('Content-Type')}")
+            if response.status_code != 200:
+                print(f"❌ Request failed for {repo}: {response.text[:200]}")
                 continue
 
-            for result in data.get('results', []):
+            try:
+                data = response.json()
+            except ValueError:
+                print("❌ Failed to parse JSON response. Raw content:")
+                print(response.text[:300])
+                continue
+
+            results = data.get('results', [])
+            for result in results:
                 file_path = result.get('path', '')
-                for match in result.get('matches', []):
+                matches = result.get('matches', [])
+                for match in matches:
                     line = match.get('line', '')
                     clean_line = line.encode('utf-8', errors='replace').decode('utf-8')
                     ips = ip_regex.findall(clean_line)
@@ -71,10 +74,7 @@ with open('output.csv', mode='w', newline='', encoding='utf-8', errors='replace'
                             'File': file_path,
                             'IP Found': ip
                         })
-                        print(f"✅ Found IP {ip} in {file_path}")
+                        print(f"[+] {ip} found in {repo}{file_path}")
 
-        except requests.exceptions.HTTPError as e:
-            print(f"❌ HTTP error for {project}/{repo}: {e}")
-            print(response.text[:300])
         except Exception as e:
-            print(f"❌ Error for {project}/{repo}: {e}")
+            print(f"❌ Exception for {project}/{repo}: {e}")
