@@ -49,3 +49,32 @@ with open('output.csv', mode='w', newline='', encoding='utf-8', errors='replace'
         }
 
         try:
+            response = requests.post(search_url, headers=headers, json=payload)
+            response.raise_for_status()  # Raise error for bad status
+
+            data = response.json()
+            if not isinstance(data, dict):
+                print(f"❌ Unexpected response format for {project}/{repo}: not a dict")
+                print(data)
+                continue
+
+            for result in data.get('results', []):
+                file_path = result.get('path', '')
+                for match in result.get('matches', []):
+                    line = match.get('line', '')
+                    clean_line = line.encode('utf-8', errors='replace').decode('utf-8')
+                    ips = ip_regex.findall(clean_line)
+                    for ip in ips:
+                        writer.writerow({
+                            'Project': project,
+                            'Repository': repo,
+                            'File': file_path,
+                            'IP Found': ip
+                        })
+                        print(f"✅ Found IP {ip} in {file_path}")
+
+        except requests.exceptions.HTTPError as e:
+            print(f"❌ HTTP error for {project}/{repo}: {e}")
+            print(response.text[:300])
+        except Exception as e:
+            print(f"❌ Error for {project}/{repo}: {e}")
