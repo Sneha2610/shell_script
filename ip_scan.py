@@ -1,92 +1,61 @@
-import os
 import csv
+import requests
 import re
-import tempfile
-import subprocess
-from pathlib import Path
-import shutil
+import os
 
-# === CONFIGURATION ===
-ADO_ORG = "YOUR_ORG_NAME"  # 🔁 Replace with your Azure DevOps org name
-ADO_PAT = os.getenv("ADO_PAT")
-INPUT_CSV = "repo.csv"
-OUTPUT_CSV = "report.csv"
+# ------------------ Config ------------------
+ADO_ORG = "your-org-name"  # Change this
+API_VERSION = "7.1-preview.1"
+PAT = os.environ.get("ADO_PAT")  # Export PAT as an env variable
 
-if not ADO_PAT:
-    raise EnvironmentError("Set your ADO_PAT environment variable.")
+# Regex for IPv4
+ip_regex = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})\b')
 
-ip_regex = re.compile(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b')
+# Headers and auth
+auth = requests.auth.HTTPBasicAuth('', PAT)
+headers = { "Content-Type": "application/json" }
 
-# === FUNCTIONS ===
+# ------------------ Load Repos ------------------
+with open('repo.csv', newline='') as csvfile:
+    reader = csv.DictReader(csvfile)
+    repo_list = [row for row in reader]
 
-def build_repo_url(project, repo):
-    return f"https://{ADO_ORG}@dev.azure.com/{ADO_ORG}/{project}/_git/{repo}"
+# ------------------ Output CSV ------------------
+with open('output.csv', mode='w', newline='') as out_file:
+    fieldnames = ['Project', 'Repository', 'File', 'IP Found']
+    writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+    writer.writeheader()
 
-def clone_repo(repo_url, clone_dir):
-    auth_url = repo_url.replace("https://", f"https://:{ADO_PAT}@")
-    print(f"🔄 Cloning: {repo_url}")
-    result = subprocess.run(
-        ["git", "clone", "--depth=1", auth_url, clone_dir],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-    if result.returncode != 0:
-        print(f"❌ Clone failed: {repo_url}\n{result.stderr}")
-        return False
-    return True
+    for entry in repo_list:
+        project = entry['project']
+        repo = entry['repository']
+        print(f"🔍 Scanning: {project}/{repo}")
 
-def search_ips(project, repo, repo_path):
-    results = []
-    for root, _, files in os.walk(repo_path):
-        for file in files:
-            path = Path(root) / file
-            try:
-                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                    ips = ip_regex.findall(content)
-                    for ip in ips:
-                        results.append({
-                            "project": project,
-                            "repo": repo,
-                            "file": str(path.relative_to(repo_path)),
-                            "ip": ip
-                        })
-            except Exception as e:
-                print(f"⚠️ Failed to read {path}: {e}")
-    return results
+        search_url = (
+            f"https://almsearch.dev.azure.com/{ADO_ORG}/{project}/_apis/search/codesearchresults"
+            f"?api-version={API_VERSION}"
+            f"&$top=1000"
+            f"&searchText=."
+            f"&filters=Repository:{repo}"
+        )
 
-def write_results(results):
-    file_exists = os.path.isfile(OUTPUT_CSV)
-    with open(OUTPUT_CSV, 'a', newline='') as csvfile:
-        fieldnames = ["project", "repo", "file", "ip"]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        if not file_exists:
-            writer.writeheader()
-        writer.writerows(results)
+        resp = requests.get(search_url, auth=auth, headers=headers)
+        if resp.status_code != 200:
+            print(f"❌ Failed for {repo}: {resp.status_code}")
+            continue
 
-# === MAIN SCRIPT ===
-
-def main():
-    with open(INPUT_CSV, newline='') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            project = row['project'].strip()
-            repo = row['repo'].strip()
-            repo_url = build_repo_url(project, repo)
-
-            with tempfile.TemporaryDirectory() as tmpdir:
-                repo_path = os.path.join(tmpdir, repo)
-                if clone_repo(repo_url, repo_path):
-                    ip_results = search_ips(project, repo, repo_path)
-                    if ip_results:
-                        write_results(ip_results)
-                        print(f"✅ IPs found in {repo}. Logged to {OUTPUT_CSV}")
-                    else:
-                        print(f"✅ No IPs found in {repo}")
-                # Repo is auto-deleted with TemporaryDirectory
-
-    print("\n🚀 Scan complete.")
-
-if __name__ == "__main__":
-    main()
+        results = resp.json().get('results', [])
+        for result in results:
+            file_path = result.get('path', '')
+            matches = result.get('matches', [])
+            for match in matches:
+                line = match.get('line', '')
+                ips = ip_regex.findall(line)
+                for ip in ips:
+                    writer.writerow({
+                        'Project': project,
+                        'Repository': repo,
+                        'File': file_path,
+                        'IP Found': ip
+                    })
+                    print(f"[+] {ip} found in {repo}{file_path}")
