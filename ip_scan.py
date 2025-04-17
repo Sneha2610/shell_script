@@ -2,18 +2,25 @@ import csv
 import requests
 import re
 import os
+import base64
 
 # ------------------ Config ------------------
-ADO_ORG = "your-org-name"  # 🔁 Replace with your Azure DevOps org
+ADO_ORG = "your-org-name"  # 🔁 Replace with your Azure DevOps org name
 API_VERSION = "7.1-preview.1"
 PAT = os.environ.get("ADO_PAT")  # 🔐 Set your PAT as an environment variable
+
+if not PAT:
+    raise EnvironmentError("❌ ADO_PAT environment variable not set.")
 
 # Regex for IPv4
 ip_regex = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})\b')
 
-# Auth setup
-auth = requests.auth.HTTPBasicAuth('', PAT)
-headers = { "Content-Type": "application/json" }
+# Auth header
+encoded_pat = base64.b64encode(f':{PAT}'.encode()).decode()
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Basic {encoded_pat}"
+}
 
 # ------------------ Load Repos from repo.csv ------------------
 with open('repo.csv', newline='', encoding='utf-8') as csvfile:
@@ -29,19 +36,24 @@ with open('output.csv', mode='w', newline='', encoding='utf-8', errors='replace'
     for entry in repo_list:
         project = entry['project']
         repo = entry['repository']
-        print(f"🔍 Scanning: {project}/{repo}")
+        print(f"Scanning: {project}/{repo}")
 
-        # Build search URL
+        # Build correct search URL
         search_url = (
-            f"https://almsearch.dev.azure.com/{ADO_ORG}/{project}/_apis/search/codesearchresults"
+            f"https://dev.azure.com/{ADO_ORG}/_apis/search/codesearchresults"
             f"?api-version={API_VERSION}"
-            f"&$top=1000"
-            f"&searchText=."
-            f"&filters=Repository:{repo}"
         )
+        payload = {
+            "searchText": ".",
+            "filters": {
+                "Project": [project],
+                "Repository": [repo]
+            },
+            "$top": 1000
+        }
 
         # Send request
-        resp = requests.get(search_url, auth=auth, headers=headers)
+        resp = requests.post(search_url, headers=headers, json=payload)
         if resp.status_code != 200:
             print(f"❌ Failed for {repo}: {resp.status_code} - {resp.text}")
             continue
@@ -61,4 +73,4 @@ with open('output.csv', mode='w', newline='', encoding='utf-8', errors='replace'
                         'File': file_path,
                         'IP Found': ip
                     })
-                    print(f"[+] {ip} found in {repo}{file_path}")
+                    print(f"IP found: {ip} in {repo}{file_path}")
