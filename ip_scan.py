@@ -7,24 +7,22 @@ import json
 # ------------------ Config ------------------
 ADO_ORG = "your-org-name"  # 🔁 Replace with your Azure DevOps org name
 API_VERSION = "7.1-preview.1"
-PAT = os.environ.get("ADO_PAT")  # 🔐 Ensure this is set: export ADO_PAT=yourPAT
+PAT = os.environ.get("ADO_PAT")  # 🔐 Set your PAT as an environment variable
 
-# Regex to match IPv4 addresses
+# Regex for IPv4
 ip_regex = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})\b')
 
-# Basic Auth
+# Auth and headers
 auth = requests.auth.HTTPBasicAuth('', PAT)
-headers = {
-    "Content-Type": "application/json"
-}
+headers = {"Content-Type": "application/json"}
 
-# Load repos from CSV
+# ------------------ Load Repos ------------------
 with open('repo.csv', newline='', encoding='utf-8') as csvfile:
     reader = csv.DictReader(csvfile)
     repo_list = [row for row in reader]
 
-# Write results to output.csv
-with open('output.csv', mode='w', newline='', encoding='utf-8') as out_file:
+# ------------------ Output CSV ------------------
+with open('output.csv', mode='w', newline='', encoding='utf-8', errors='replace') as out_file:
     fieldnames = ['Project', 'Repository', 'File', 'IP Found']
     writer = csv.DictWriter(out_file, fieldnames=fieldnames)
     writer.writeheader()
@@ -32,15 +30,14 @@ with open('output.csv', mode='w', newline='', encoding='utf-8') as out_file:
     for entry in repo_list:
         project = entry['project']
         repo = entry['repository']
-        print(f"\n🔍 Scanning: {project}/{repo}")
+        print(f"🔍 Scanning: {project}/{repo}")
 
-        # API URL
+        # Search URL and payload
         url = f"https://almsearch.dev.azure.com/{ADO_ORG}/{project}/_apis/search/codesearchresults?api-version={API_VERSION}"
-
-        # Payload for the POST request
         payload = {
             "searchText": ".",
             "filters": {
+                "Project": [project],
                 "Repository": [repo]
             },
             "$top": 100
@@ -48,37 +45,31 @@ with open('output.csv', mode='w', newline='', encoding='utf-8') as out_file:
 
         try:
             resp = requests.post(url, headers=headers, auth=auth, json=payload)
-
-            # Debug HTTP response
-            print(f"🔎 HTTP Status: {resp.status_code}")
             if resp.status_code != 200:
-                print(f"❌ Error for {repo}:\n{resp.text[:300]}")
+                print(f"❌ {project}/{repo} failed: {resp.status_code} - {resp.text}")
                 continue
 
-            try:
-                data = resp.json()
-            except json.JSONDecodeError:
-                print("❌ Couldn't decode JSON. Raw text:")
-                print(resp.text[:300])
-                continue
+            data = resp.json()
 
-            if not isinstance(data, dict):
-                print("❌ Unexpected response type (not a dict):")
-                print(data)
-                continue
+            # Optional: save raw response for debugging
+            with open(f"debug_{project}_{repo}.json", "w", encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
 
             results = data.get('results', [])
-            if not isinstance(results, list):
-                print("⚠️ 'results' is not a list. Skipping.")
+
+            if isinstance(results, str):
+                print(f"⚠️ Skipped {repo}: Unexpected string in 'results'")
                 continue
 
             for result in results:
+                if not isinstance(result, dict):
+                    continue
                 file_path = result.get('path', '')
                 matches = result.get('matches', [])
                 for match in matches:
                     line = match.get('line', '')
-                    line_clean = line.encode('utf-8', errors='replace').decode('utf-8')
-                    ips = ip_regex.findall(line_clean)
+                    line = line.encode('utf-8', errors='replace').decode('utf-8')
+                    ips = ip_regex.findall(line)
                     for ip in ips:
                         writer.writerow({
                             'Project': project,
@@ -86,7 +77,7 @@ with open('output.csv', mode='w', newline='', encoding='utf-8') as out_file:
                             'File': file_path,
                             'IP Found': ip
                         })
-                        print(f"[+] {ip} in {repo}/{file_path}")
+                        print(f"[+] {ip} found in {repo}{file_path}")
 
         except Exception as e:
-            print(f"❌ Exception for {project}/{repo}: {e}")
+            print(f"🔥 Error processing {repo}: {e}")
