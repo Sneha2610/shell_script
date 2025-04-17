@@ -4,73 +4,66 @@ import re
 import os
 import base64
 
-# ------------------ Config ------------------
-ADO_ORG = "your-org-name"  # 🔁 Replace with your Azure DevOps org name
+# Config
+ADO_ORG = "your-org-name"  # Replace with your Azure DevOps organization name
 API_VERSION = "7.1-preview.1"
-PAT = os.environ.get("ADO_PAT")  # 🔐 Set your PAT as an environment variable
+PAT = os.environ.get("ADO_PAT")
 
 if not PAT:
-    raise EnvironmentError("❌ ADO_PAT environment variable not set.")
-
-# Regex for IPv4
-ip_regex = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})\b')
+    raise EnvironmentError("Environment variable ADO_PAT not set.")
 
 # Auth header
-encoded_pat = base64.b64encode(f':{PAT}'.encode()).decode()
+encoded_pat = base64.b64encode(f":{PAT}".encode()).decode()
 headers = {
     "Content-Type": "application/json",
     "Authorization": f"Basic {encoded_pat}"
 }
 
-# ------------------ Load Repos from repo.csv ------------------
-with open('repo.csv', newline='', encoding='utf-8') as csvfile:
-    reader = csv.DictReader(csvfile)
-    repo_list = [row for row in reader]
+# IPv4 Regex
+ip_regex = re.compile(r'\b(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})\b')
 
-# ------------------ Output to output.csv ------------------
+# Load repo list
+with open('repo.csv', newline='', encoding='utf-8') as f:
+    reader = csv.DictReader(f)
+    repos = [row for row in reader]
+
+# Write output
 with open('output.csv', mode='w', newline='', encoding='utf-8', errors='replace') as out_file:
-    fieldnames = ['Project', 'Repository', 'File', 'IP Found']
-    writer = csv.DictWriter(out_file, fieldnames=fieldnames)
+    writer = csv.DictWriter(out_file, fieldnames=['Project', 'Repository', 'File', 'IP Found'])
     writer.writeheader()
 
-    for entry in repo_list:
-        project = entry['project']
-        repo = entry['repository']
-        print(f"Scanning: {project}/{repo}")
+    for repo_entry in repos:
+        project = repo_entry['project']
+        repository = repo_entry['repository']
+        print(f"🔍 Scanning {project}/{repository}")
 
-        # Build correct search URL
-        search_url = (
-            f"https://dev.azure.com/{ADO_ORG}/_apis/search/codesearchresults"
-            f"?api-version={API_VERSION}"
-        )
+        search_url = f"https://dev.azure.com/{ADO_ORG}/_apis/search/codesearchresults?api-version={API_VERSION}"
+
         payload = {
             "searchText": ".",
             "filters": {
                 "Project": [project],
-                "Repository": [repo]
+                "Repository": [repository]
             },
             "$top": 1000
         }
 
-        # Send request
-        resp = requests.post(search_url, headers=headers, json=payload)
-        if resp.status_code != 200:
-            print(f"❌ Failed for {repo}: {resp.status_code} - {resp.text}")
+        response = requests.post(search_url, headers=headers, json=payload)
+        if response.status_code != 200:
+            print(f"❌ Failed for {project}/{repository}: {response.status_code}")
+            print(response.text[:300])  # Print first part of HTML to help debug
             continue
 
-        results = resp.json().get('results', [])
-        for result in results:
+        for result in response.json().get('results', []):
             file_path = result.get('path', '')
-            matches = result.get('matches', [])
-            for match in matches:
+            for match in result.get('matches', []):
                 line = match.get('line', '')
-                line = line.encode('utf-8', errors='replace').decode('utf-8')  # 🧼 Clean line
-                ips = ip_regex.findall(line)
-                for ip in ips:
+                line = line.encode('utf-8', errors='replace').decode('utf-8')
+                for ip in ip_regex.findall(line):
                     writer.writerow({
                         'Project': project,
-                        'Repository': repo,
+                        'Repository': repository,
                         'File': file_path,
                         'IP Found': ip
                     })
-                    print(f"IP found: {ip} in {repo}{file_path}")
+                    print(f"✅ Found IP: {ip} in {file_path}")
