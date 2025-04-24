@@ -1,93 +1,94 @@
 import os
 import csv
+import tempfile
+import shutil
+import fnmatch
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
+from git import Repo
 import requests
-import concurrent.futures
 
 # === CONFIG ===
-ADO_ORG_URL = "https://dev.azure.com/<your_org>"  # CHANGE this
-SEARCH_STRING = "your_search_string"              # CHANGE this
-OUTPUT_FILE = "ado_search_results.csv"
+ADO_ORG = "your-org"  # <-- CHANGE THIS
+ADO_URL = f"https://dev.azure.com/{ADO_ORG}"
+SEARCH_STRING = "your_search_string"  # <-- CHANGE THIS
+CSV_FILE = "release_search_results.csv"
+THREADS = 5
 
-# === Setup ===
-PAT = os.environ.get("ADO_PAT")
+# === AUTH ===
+PAT = os.getenv("ADO_PAT")
 if not PAT:
-    raise EnvironmentError("Environment variable ADO_PAT is not set.")
-auth = ("", PAT)
-HEADERS = {"Content-Type": "application/json"}
+    raise Exception("ADO_PAT environment variable not set")
 
-# Write CSV header once
-with open(OUTPUT_FILE, mode="w", newline="", encoding="utf-8") as f:
-    writer = csv.writer(f)
-    writer.writerow(["Search String", "Project", "Repo", "File Path", "Line Number"])
-
-def log_and_write(row):
-    print("MATCH FOUND:", row)
-    with open(OUTPUT_FILE, mode="a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(row)
+AUTH_HEADER = {
+    "Authorization": f"Basic {requests.auth._basic_auth_str('', PAT)}"
+}
 
 def get_projects():
-    url = f"{ADO_ORG_URL}/_apis/projects?api-version=7.0"
-    r = requests.get(url, auth=auth)
-    r.raise_for_status()
-    return [p["name"] for p in r.json()["value"]]
+    url = f"{ADO_URL}/_apis/projects?api-version=7.0"
+    resp = requests.get(url, headers=AUTH_HEADER)
+    resp.raise_for_status()
+    return [p["name"] for p in resp.json()["value"]]
 
 def get_repos(project):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories?api-version=7.0"
-    r = requests.get(url, auth=auth)
-    r.raise_for_status()
-    return r.json()["value"]
+    url = f"{ADO_URL}/{project}/_apis/git/repositories?api-version=7.0"
+    resp = requests.get(url, headers=AUTH_HEADER)
+    resp.raise_for_status()
+    return [(r["name"], r["remoteUrl"]) for r in resp.json()["value"]]
 
-def get_release_branches(project, repo_id):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/refs?filter=heads/release/&api-version=7.0"
-    r = requests.get(url, auth=auth)
-    r.raise_for_status()
-    return [b["name"].replace("refs/heads/", "") for b in r.json()["value"]]
-
-def get_files(project, repo_id, branch):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items?recursionLevel=Full&versionDescriptor.version={branch}&api-version=7.0"
-    r = requests.get(url, auth=auth)
-    r.raise_for_status()
-    return [item["path"] for item in r.json()["value"] if item["gitObjectType"] == "blob"]
-
-def get_file_content(project, repo_id, path, branch):
-    url = f"{ADO_ORG_URL}/{project}/_apis/git/repositories/{repo_id}/items?path={path}&versionDescriptor.version={branch}&includeContent=true&api-version=7.0"
-    r = requests.get(url, auth=auth)
-    if r.status_code == 200:
-        return r.text
-    return ""
-
-def search_file(project, repo_name, repo_id, branch, path):
+def clone_and_search(project, repo_name, remote_url):
+    print(f"[CLONE] {project}/{repo_name}")
+    workdir = tempfile.mkdtemp()
     try:
-        content = get_file_content(project, repo_id, path, branch)
-        for i, line in enumerate(content.splitlines(), 1):
-            if SEARCH_STRING in line:
-                log_and_write([SEARCH_STRING, project, repo_name, path, i])
-    except Exception as e:
-        print(f"[ERROR] File read failed: {path} in {repo_name}: {e}")
+        repo_path = os.path.join(workdir, repo_name)
+        repo = Repo.clone_from(remote_url, repo_path, multi_options=['--mirror'])
+        refs = subprocess.check_output(
+            ["git", "--git-dir", repo_path, "for-each-ref", "--format=%(refname:short)"],
+            text=True
+        )
+        branches = [ref for ref in refs.splitlines() if fnmatch.fnmatch(ref, "release/*")]
 
-def process_repo(project, repo):
-    repo_id = repo["id"]
-    repo_name = repo["name"]
-    try:
-        branches = get_release_branches(project, repo_id)
         for branch in branches:
-            files = get_files(project, repo_id, branch)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                for path in files:
-                    executor.submit(search_file, project, repo_name, repo_id, branch, path)
+            print(f"[BRANCH] {repo_name}: {branch}")
+            full_clone = Repo.clone_from(remote_url, os.path.join(workdir, f"{repo_name}_{branch}"), branch=branch, depth=1)
+            repo_dir = full_clone.working_tree_dir
+            for root, _, files in os.walk(repo_dir):
+                for file in files:
+                    try:
+                        path = os.path.join(root, file)
+                        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                            for i, line in enumerate(f, 1):
+                                if SEARCH_STRING in line:
+                                    relative = os.path.relpath(path, repo_dir)
+                                    row = [SEARCH_STRING, project, repo_name, branch, relative, i]
+                                    print("FOUND:", row)
+                                    with open(CSV_FILE, mode="a", newline="", encoding="utf-8") as fcsv:
+                                        csv.writer(fcsv).writerow(row)
+                    except Exception as e:
+                        print(f"[ERROR] Reading file {file} in {repo_name}: {e}")
     except Exception as e:
-        print(f"[ERROR] Repo: {repo_name} in {project} — {e}")
+        print(f"[ERROR] Failed {project}/{repo_name}: {e}")
+    finally:
+        shutil.rmtree(workdir)
 
 def main():
-    try:
-        projects = get_projects()
-        for project in projects:
-            repos = get_repos(project)
-            for repo in repos:
-                process_repo(project, repo)
-    except Exception as e:
-        print(f"[ERROR] Failed to scan: {e}")
+    with open(CSV_FILE, mode="w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerow(["Search String", "Project", "Repo", "Branch", "File Path", "Line Number"])
+
+    projects = get_projects()
+    jobs = []
+    for project in projects:
+        repos = get_repos(project)
+        for repo_name, remote_url in repos:
+            # Replace PAT in remote URL
+            if "@dev.azure.com" in remote_url:
+                remote_url = remote_url.replace("https://", f"https://{PAT}@")
+
+            jobs.append((project, repo_name, remote_url))
+
+    with ThreadPoolExecutor(max_workers=THREADS) as executor:
+        for job in jobs:
+            executor.submit(clone_and_search, *job)
 
 if __name__ == "__main__":
     main()
