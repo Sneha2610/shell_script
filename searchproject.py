@@ -5,40 +5,49 @@ import subprocess
 from tempfile import TemporaryDirectory
 
 # === CONFIGURATION ===
-SEARCH_STRING = "your_search_string_here"  # ← Replace this
+SEARCH_STRING = "your_search_string_here"  # Replace this
 INPUT_CSV = "repos.csv"
 OUTPUT_CSV = "result.csv"
-ORGANIZATION = "your-org-name"             # ← Replace this
-TOKEN = os.getenv("TOKEN")                 # Set this before running: export TOKEN=yourPAT
+ORGANIZATION = "your-org-name"             # Replace this
+TOKEN = os.getenv("TOKEN")                 # Make sure this is exported
 
-def get_latest_release_branch(repo_path):
-    subprocess.run(["git", "fetch", "--all"], cwd=repo_path, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        branches = subprocess.check_output(["git", "branch", "-r"], cwd=repo_path).decode().splitlines()
-    except subprocess.CalledProcessError:
-        return None
+def get_latest_release_branch(repo_url):
+    with TemporaryDirectory() as tmp:
+        result = subprocess.run(
+            ["git", "clone", "--filter=blob:none", "--no-checkout", repo_url, tmp],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        if result.returncode != 0:
+            return None, None
 
-    release_branches = [
-        b.strip().split("origin/")[-1]
-        for b in branches if "origin/release/" in b
-    ]
+        subprocess.run(["git", "fetch", "--all"], cwd=tmp, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    latest_branch = None
-    latest_time = 0
-    for branch in release_branches:
         try:
-            timestamp = subprocess.check_output(
-                ["git", "log", "-1", "--format=%ct", f"origin/{branch}"],
-                cwd=repo_path
-            ).decode().strip()
-            if int(timestamp) > latest_time:
-                latest_time = int(timestamp)
-                latest_branch = branch
+            branches = subprocess.check_output(["git", "branch", "-r"], cwd=tmp).decode().splitlines()
         except subprocess.CalledProcessError:
-            continue
-    return latest_branch
+            return None, None
 
-def search_in_repo(repo_url, branch):
+        release_branches = [
+            b.strip().split("origin/")[-1]
+            for b in branches if "origin/release/" in b
+        ]
+
+        latest_branch = None
+        latest_time = 0
+        for branch in release_branches:
+            try:
+                timestamp = subprocess.check_output(
+                    ["git", "log", "-1", "--format=%ct", f"origin/{branch}"],
+                    cwd=tmp
+                ).decode().strip()
+                if int(timestamp) > latest_time:
+                    latest_time = int(timestamp)
+                    latest_branch = branch
+            except subprocess.CalledProcessError:
+                continue
+        return latest_branch, tmp if latest_branch else (None, None)
+
+def search_in_release_branch(repo_url, branch):
     matches = []
     with TemporaryDirectory() as temp_dir:
         result = subprocess.run(
@@ -55,7 +64,7 @@ def search_in_repo(repo_url, branch):
                 filepath = os.path.join(root, file)
                 try:
                     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                        for line_num, line in enumerate(f, 1):
+                        for line in f:
                             if SEARCH_STRING in line:
                                 rel_path = os.path.relpath(filepath, temp_dir)
                                 matches.append((rel_path, branch, line.strip()))
@@ -87,21 +96,16 @@ def main():
         if prefix in seen_prefixes:
             continue
 
-        print(f"🔍 Scanning {project}/{repo}...")
+        print(f"🔍 Scanning latest release/* of {project}/{repo}...")
 
         repo_url = f"https://{TOKEN}@dev.azure.com/{ORGANIZATION}/{project}/_git/{repo}"
 
-        # Try main branch first
-        matches = search_in_repo(repo_url, "main")
+        release_branch, _ = get_latest_release_branch(repo_url)
+        if not release_branch:
+            print(f"⚠️  No release/* branches found for {repo}")
+            continue
 
-        # If nothing found, try latest release/*
-        if not matches:
-            with TemporaryDirectory() as tmp:
-                subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout", repo_url, tmp],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                latest_release = get_latest_release_branch(tmp)
-                if latest_release:
-                    matches = search_in_repo(repo_url, latest_release)
+        matches = search_in_release_branch(repo_url, release_branch)
 
         if matches:
             seen_prefixes.add(prefix)
